@@ -367,6 +367,18 @@
         仅格式显示: true
         仅格式提示词: false
 
+    - 正则名称: '[兼容]无本地正则-清理标签输出'
+      id: 9f8b7a01-2ed5-4d6f-8ea2-0fe35a5f9c11
+      启用: true
+      查找表达式: /<think[\s\S]*?<\/think>|<Thought[\s\S]*?<\/Thought>|<OnStageCharacters[\s\S]*?<\/OnStageCharacters>|<NpcRelationHints[\s\S]*?<\/NpcRelationHints>/gsi
+      内容: ''
+      来源:
+        用户输入: false
+        AI输出: true
+      作用于:
+        仅格式显示: true
+        仅格式提示词: false
+
     - 正则名称: '[隐藏]仅显示状态栏'
       id: 6d2b6ef6-4f3d-4a1f-8f3b-9b0b6fd0f1d7
       启用: true

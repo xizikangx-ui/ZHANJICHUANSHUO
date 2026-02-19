@@ -231,7 +231,7 @@
         <pre class="mvu-body">{{ display_floor_text }}</pre>
       </section>
       <section class="next-actions">
-        <h2>接下来可进行</h2>
+        <h2>接下来可进行（随最新AI回复更新）</h2>
         <div class="next-actions-grid">
           <button
             v-for="action in next_action_options"
@@ -506,12 +506,13 @@ const display_floor_text = computed(() => {
   if (direct) return direct;
   return extractFloorTextFromRaw(String(data.value.界面.楼层文本.原文 ?? ''));
 });
-const next_action_options = [
+const default_next_action_options = [
   '前往报到处完成登记',
   '查看学院地图并确认任务点',
   '向教官申请首次训练',
   '与在场角色进行交流',
 ];
+const next_action_options = ref<string[]>([...default_next_action_options]);
 const onstage_characters = computed(() => {
   const list = data.value.界面.在场角色;
   return Array.isArray(list) ? list : [];
@@ -913,6 +914,58 @@ watchEffect(() => {
   const in_air_battle = data.value.主角.战术.战斗模式 === '空战' && data.value.主角.战术.是否战斗中;
   if (in_air_battle) active_tab.value = 'battle';
 });
+
+function build_next_actions_from_reply(text: string): string[] {
+  const t = text.trim();
+  if (!t) return [...default_next_action_options];
+
+  const pool: string[] = [];
+  const pushUnique = (v: string) => {
+    const s = v.trim();
+    if (!s) return;
+    if (!pool.includes(s)) pool.push(s);
+  };
+
+  if (/报到|学院|新生|教官|训练/.test(t)) {
+    pushUnique('前往报到处补全入学手续');
+    pushUnique('向教官申请进行首次适配训练');
+  }
+  if (/战斗|空战|异种|敌人|警报|突袭/.test(t)) {
+    pushUnique('进入战备状态并确认当前阵线');
+    pushUnique('申请侦察并汇报敌情');
+    pushUnique('检查武装与资源后准备交战');
+  }
+  if (/图书馆|资料|线索|情报|调查/.test(t)) {
+    pushUnique('前往图书馆检索相关情报');
+    pushUnique('对当前线索进行整理并提出假设');
+  }
+  if (/任务|委托|小队|行动/.test(t)) {
+    pushUnique('确认小队分工并接受当前任务');
+    pushUnique('向队友同步行动计划');
+  }
+  if (/受伤|治疗|恢复|污染/.test(t)) {
+    pushUnique('优先处理伤势与污染状态');
+  }
+  if (/交易|黑市|物资|联合币/.test(t)) {
+    pushUnique('整理仓库并评估黑市交易方案');
+  }
+
+  // fallback
+  pushUnique('与在场角色进行交流');
+  pushUnique('查看近期事务并决定下一步');
+  pushUnique('进行一次谨慎侦察行动');
+  pushUnique('根据当前局势推进主线任务');
+
+  return pool.slice(0, 4);
+}
+
+watch(
+  () => display_floor_text.value,
+  (val) => {
+    next_action_options.value = build_next_actions_from_reply(String(val ?? ''));
+  },
+  { immediate: true },
+);
 
 function change_human(key: HumanKey, delta: number): void {
   if (delta > 0) {

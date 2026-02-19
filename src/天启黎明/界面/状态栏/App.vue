@@ -35,6 +35,11 @@
         </label>
 
         <label class="field">
+          <span>年龄：</span>
+          <input v-model.number="create_form.年龄" type="number" :min="age_limit.min" :max="age_limit.max" />
+        </label>
+
+        <label class="field">
           <span>性别：</span>
           <select v-model="create_form.性别" :disabled="create_form.职业 === '战姬'">
             <option value="男性">男性</option>
@@ -42,11 +47,6 @@
           </select>
         </label>
         <p v-if="create_form.职业 === '战姬'" class="tip">战姬角色性别固定为女性。</p>
-
-        <label class="field">
-          <span>年龄：</span>
-          <input v-model.number="create_form.年龄" type="number" :min="age_limit.min" :max="age_limit.max" />
-        </label>
 
         <p class="age-tip">年龄限制：{{ age_limit.min }} - {{ age_limit.max }}</p>
         <p v-if="create_error" class="error">{{ create_error }}</p>

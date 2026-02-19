@@ -1,1 +1,1 @@
-{"version":3,"file":"index.js","mappings":"AAAAA,EAAEC,UACAC,cAAc","sources":["src://tavern_helper_template/src/天启黎明/脚本/立即事件/index.ts"],"sourcesContent":["$(async () => {\n  injectPrompts([]);\n});\r\n"],"names":["$","async","injectPrompts"],"sourceRoot":""}
+{"version":3,"file":"index.js","mappings":"AAAAA,EAAEC,UACAC,cAAc","sources":["src://tavern_helper_template/src/天启黎明/脚本/立即事件/index.ts"],"sourcesContent":["$(async () => {\n  injectPrompts([]);\n});\n"],"names":["$","async","injectPrompts"],"sourceRoot":""}

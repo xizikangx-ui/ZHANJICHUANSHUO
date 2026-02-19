@@ -1,0 +1,1263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "default": {},
+  "type": "object",
+  "properties": {
+    "界面": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "建卡": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "已开始": {
+              "type": "boolean"
+            },
+            "角色姓名": {
+              "type": "string"
+            },
+            "职业": {
+              "default": "指挥官",
+              "type": "string",
+              "enum": [
+                "指挥官",
+                "战姬",
+                "权柄使役者"
+              ]
+            },
+            "战姬类型": {
+              "default": "轻型",
+              "type": "string",
+              "enum": [
+                "侦察型",
+                "轻型",
+                "中型",
+                "重型",
+                "要塞型",
+                "地面支援姬"
+              ]
+            },
+            "年龄": {
+              "default": 21,
+              "type": "number"
+            },
+            "作弊模式": {
+              "type": "boolean"
+            }
+          }
+        },
+        "楼层文本": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "正文": {
+              "type": "string"
+            },
+            "原文": {
+              "type": "string"
+            },
+            "更新时间": {
+              "type": "number"
+            }
+          }
+        },
+        "在场角色": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "姓名": {
+                "default": "未命名",
+                "type": "string"
+              },
+              "好感度": {
+                "type": "number"
+              },
+              "态度": {
+                "default": "中立",
+                "type": "string"
+              },
+              "内心想法": {
+                "type": "string"
+              },
+              "基础属性": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "description": "属性名"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "更新时间": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "模块折叠": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "在场角色": {
+              "type": "boolean"
+            },
+            "长期NPC": {
+              "type": "boolean"
+            }
+          }
+        },
+        "游戏结束": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "已结束": {
+              "type": "boolean"
+            },
+            "原因": {
+              "type": "string"
+            },
+            "时间戳": {
+              "type": "number"
+            }
+          }
+        },
+        "空战反馈": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "待反馈": {
+              "type": "boolean"
+            },
+            "摘要": {
+              "type": "string"
+            },
+            "时间戳": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "世界": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "当前时间": {
+          "default": "联合纪年177年8月28日 08:00",
+          "type": "string"
+        },
+        "当前地点": {
+          "default": "联合第六集团军 卡尔斯空港城",
+          "type": "string"
+        },
+        "天气": {
+          "default": "阴，低能见度",
+          "type": "string"
+        },
+        "战区威胁等级": {
+          "default": "中",
+          "type": "string",
+          "enum": [
+            "低",
+            "中",
+            "高",
+            "极危"
+          ]
+        },
+        "近期事务": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "description": "事务名"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "description": "事务描述"
+          }
+        },
+        "长期NPC列表": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "description": "NPC姓名"
+          },
+          "additionalProperties": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "姓名": {
+                "default": "未命名",
+                "type": "string"
+              },
+              "好感度": {
+                "type": "number"
+              },
+              "好感阶段": {
+                "default": "警惕",
+                "type": "string",
+                "enum": [
+                  "死敌",
+                  "危险",
+                  "警惕",
+                  "熟悉",
+                  "朋友",
+                  "挚友",
+                  "亲密",
+                  "伴侣"
+                ]
+              },
+              "态度": {
+                "default": "中立",
+                "type": "string"
+              },
+              "内心想法": {
+                "type": "string"
+              },
+              "基础属性": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "description": "属性名"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "性行为次数": {
+                "type": "number"
+              },
+              "贞洁状态": {
+                "default": "处女",
+                "type": "string",
+                "enum": [
+                  "处女",
+                  "非处女"
+                ]
+              },
+              "关系标签": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "首次记录时间": {
+                "type": "number"
+              },
+              "最后更新时间": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "NPC关系追踪": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "description": "NPC姓名"
+          },
+          "additionalProperties": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "连续出现计数": {
+                "type": "number"
+              },
+              "最近出现轮次": {
+                "type": "number"
+              },
+              "玩家随行请求命中次数": {
+                "type": "number"
+              },
+              "最近玩家请求时间": {
+                "type": "number"
+              },
+              "是否已转长期": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "主角": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "档案": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "代号": {
+              "default": "待命战姬",
+              "type": "string"
+            },
+            "阵营": {
+              "default": "战姬武装部",
+              "type": "string"
+            },
+            "职阶": {
+              "default": "预备役",
+              "type": "string"
+            },
+            "身份路径": {
+              "default": "轻型战姬",
+              "type": "string"
+            }
+          }
+        },
+        "人类属性": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "力量": {
+              "default": 1,
+              "type": "number"
+            },
+            "敏捷": {
+              "default": 1,
+              "type": "number"
+            },
+            "体质": {
+              "default": 1,
+              "type": "number"
+            },
+            "感知": {
+              "default": 1,
+              "type": "number"
+            },
+            "意志": {
+              "default": 1,
+              "type": "number"
+            },
+            "魅力": {
+              "default": 1,
+              "type": "number"
+            },
+            "学识": {
+              "default": 1,
+              "type": "number"
+            }
+          }
+        },
+        "锻炼": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "力量": {
+              "type": "number"
+            },
+            "敏捷": {
+              "type": "number"
+            },
+            "体质": {
+              "type": "number"
+            },
+            "感知": {
+              "type": "number"
+            },
+            "意志": {
+              "type": "number"
+            },
+            "魅力": {
+              "type": "number"
+            },
+            "学识": {
+              "type": "number"
+            }
+          }
+        },
+        "属性": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "魔力评级": {
+              "default": 20,
+              "type": "number"
+            },
+            "力量加成": {
+              "default": 18,
+              "type": "number"
+            },
+            "体质加成": {
+              "default": 18,
+              "type": "number"
+            },
+            "抗污染值": {
+              "default": 18,
+              "type": "number"
+            },
+            "飞行速度": {
+              "default": 20,
+              "type": "number"
+            },
+            "防御评级": {
+              "default": 12,
+              "type": "number"
+            }
+          }
+        },
+        "成长": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "战姬老练等级": {
+              "default": 1,
+              "type": "number"
+            },
+            "权柄使役者等级": {
+              "default": 1,
+              "type": "number"
+            },
+            "魔力碎片": {
+              "type": "number"
+            },
+            "下一级所需魔力碎片": {
+              "default": 10,
+              "type": "number"
+            },
+            "权柄碎片": {
+              "type": "number"
+            },
+            "权柄本源": {
+              "type": "boolean"
+            }
+          }
+        },
+        "灵装化": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "启用": {
+              "type": "boolean"
+            },
+            "手动切换": {
+              "type": "boolean"
+            },
+            "灵装模式": {
+              "default": "标准",
+              "type": "string",
+              "enum": [
+                "待机",
+                "标准",
+                "过载"
+              ]
+            },
+            "每回合耗魔": {
+              "default": 8,
+              "type": "number"
+            },
+            "每回合耗槽": {
+              "default": 1,
+              "type": "number"
+            },
+            "上次结算轮次": {
+              "type": "number"
+            }
+          }
+        },
+        "资源": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "当前生命": {
+              "default": 100,
+              "type": "number"
+            },
+            "最大生命": {
+              "default": 100,
+              "type": "number"
+            },
+            "当前魔力": {
+              "default": 100,
+              "type": "number"
+            },
+            "最大魔力": {
+              "default": 100,
+              "type": "number"
+            },
+            "污染值": {
+              "type": "number"
+            },
+            "行动点": {
+              "default": 1,
+              "type": "number"
+            },
+            "移动点": {
+              "default": 1,
+              "type": "number"
+            },
+            "灵装槽当前": {
+              "default": 10,
+              "type": "number"
+            },
+            "灵装槽上限": {
+              "default": 10,
+              "type": "number"
+            }
+          }
+        },
+        "基础能力": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "已选": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "技能树": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "可用技能点": {
+              "default": 4,
+              "type": "number"
+            },
+            "已用技能点": {
+              "type": "number"
+            },
+            "已解锁": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "description": "节点ID"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            },
+            "自定义": {
+              "type": "string"
+            }
+          }
+        },
+        "权柄": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "权柄名称": {
+              "type": "string"
+            },
+            "权柄途径": {
+              "default": "生命",
+              "type": "string",
+              "enum": [
+                "生命",
+                "历史",
+                "群星",
+                "黎明",
+                "黑夜",
+                "力量",
+                "希望",
+                "勇气",
+                "梦想"
+              ]
+            },
+            "碎片数": {
+              "type": "number"
+            },
+            "赋予技能": {
+              "type": "string"
+            },
+            "审核通过": {
+              "type": "boolean"
+            },
+            "审核备注": {
+              "type": "string"
+            }
+          }
+        },
+        "背景": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "原文": {
+              "type": "string"
+            },
+            "摘要": {
+              "type": "string"
+            }
+          }
+        },
+        "战术": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "战斗模式": {
+              "default": "非战斗",
+              "type": "string",
+              "enum": [
+                "非战斗",
+                "空战",
+                "地面战"
+              ]
+            },
+            "是否战斗中": {
+              "type": "boolean"
+            },
+            "当前阵线": {
+              "default": "中线",
+              "type": "string",
+              "enum": [
+                "后卫",
+                "中线",
+                "前线",
+                "交锋区"
+              ]
+            },
+            "制空权": {
+              "default": "争夺中",
+              "type": "string",
+              "enum": [
+                "我方",
+                "敌方",
+                "争夺中"
+              ]
+            },
+            "当前轮次": {
+              "default": 1,
+              "type": "number"
+            },
+            "重型移动计数": {
+              "type": "number"
+            },
+            "火力惩罚": {
+              "default": "无",
+              "type": "string"
+            },
+            "词条区": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "description": "单位名"
+              },
+              "additionalProperties": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "空战": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "菜单开启": {
+                  "type": "boolean"
+                },
+                "流程阶段": {
+                  "default": "遭遇",
+                  "type": "string",
+                  "enum": [
+                    "遭遇",
+                    "行动点计算",
+                    "站位划分",
+                    "制空判定",
+                    "行动序列",
+                    "回合执行",
+                    "空战结算"
+                  ]
+                },
+                "天气": {
+                  "default": "天气晴朗",
+                  "type": "string",
+                  "enum": [
+                    "万里无云",
+                    "天气晴朗",
+                    "阴雨连绵",
+                    "雷暴雨天",
+                    "台风天"
+                  ]
+                },
+                "天气判定值": {
+                  "default": 11,
+                  "type": "number"
+                },
+                "天气命中修正": {
+                  "default": 5,
+                  "type": "number"
+                },
+                "天气探测修正": {
+                  "type": "number"
+                },
+                "天气移速倍率": {
+                  "default": 1,
+                  "type": "number"
+                },
+                "空域层": {
+                  "default": "标准空域",
+                  "type": "string",
+                  "enum": [
+                    "湍流层",
+                    "云层",
+                    "高空",
+                    "标准空域",
+                    "低空",
+                    "地面"
+                  ]
+                },
+                "格距米": {
+                  "default": 500,
+                  "type": "number"
+                },
+                "我方单位": {
+                  "default": {},
+                  "type": "object",
+                  "properties": {
+                    "侦察型": {
+                      "type": "number"
+                    },
+                    "轻型": {
+                      "type": "number"
+                    },
+                    "中型": {
+                      "type": "number"
+                    },
+                    "重型": {
+                      "type": "number"
+                    },
+                    "要塞型": {
+                      "type": "number"
+                    },
+                    "其他": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "敌方单位": {
+                  "default": {},
+                  "type": "object",
+                  "properties": {
+                    "侦察型": {
+                      "type": "number"
+                    },
+                    "轻型": {
+                      "type": "number"
+                    },
+                    "中型": {
+                      "type": "number"
+                    },
+                    "重型": {
+                      "type": "number"
+                    },
+                    "要塞型": {
+                      "type": "number"
+                    },
+                    "其他": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "我方制空点": {
+                  "type": "number"
+                },
+                "敌方制空点": {
+                  "type": "number"
+                },
+                "制空修正": {
+                  "type": "number"
+                },
+                "重武器命中条件": {
+                  "default": "无",
+                  "type": "string"
+                },
+                "触发突袭轮": {
+                  "type": "boolean"
+                },
+                "突袭来源": {
+                  "default": "无",
+                  "type": "string"
+                },
+                "当前行动序列": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "台风眼格": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "侦查单位类型": {
+                  "default": "侦察型",
+                  "type": "string",
+                  "enum": [
+                    "侦察型",
+                    "轻型",
+                    "中型",
+                    "重型及以上"
+                  ]
+                },
+                "侦查目标类型": {
+                  "default": "轻型",
+                  "type": "string",
+                  "enum": [
+                    "侦察型",
+                    "轻型",
+                    "中型",
+                    "重型",
+                    "要塞"
+                  ]
+                },
+                "侦查结果": {
+                  "type": "number"
+                },
+                "目标隐匿剩余": {
+                  "type": "number"
+                },
+                "我方闪避值": {
+                  "default": 3,
+                  "type": "number"
+                },
+                "敌方闪避值": {
+                  "default": 3,
+                  "type": "number"
+                },
+                "我方近失叠加命中": {
+                  "type": "number"
+                },
+                "敌方近失叠加命中": {
+                  "type": "number"
+                },
+                "最近命中详情": {
+                  "type": "string"
+                },
+                "我方总耐久": {
+                  "default": 100,
+                  "type": "number"
+                },
+                "敌方总耐久": {
+                  "default": 100,
+                  "type": "number"
+                },
+                "已结算回合": {
+                  "type": "number"
+                },
+                "最近结算摘要": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "装备": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "灵装": {
+              "default": "联合标准轻型灵装",
+              "type": "string"
+            },
+            "武器": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "description": "武器名"
+              },
+              "additionalProperties": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "等级": {
+                    "default": 1,
+                    "type": "number"
+                  },
+                  "射程": {
+                    "default": 2,
+                    "type": "number"
+                  },
+                  "描述": {
+                    "default": "制式武器",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "防具": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "description": "防具部位"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "特殊配件": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "description": "配件名"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "description": "效果描述"
+              }
+            }
+          }
+        },
+        "异常状态": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "description": "状态名"
+          },
+          "additionalProperties": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "等级": {
+                "default": "严重",
+                "type": "string",
+                "enum": [
+                  "严重",
+                  "致命",
+                  "快速致命"
+                ]
+              },
+              "效果": {
+                "default": "暂无效果描述",
+                "type": "string"
+              },
+              "剩余轮次": {
+                "default": 1,
+                "type": "number"
+              }
+            }
+          }
+        },
+        "技能检定": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "最近动作": {
+              "default": "无",
+              "type": "string"
+            },
+            "关联属性": {
+              "default": "无",
+              "type": "string",
+              "enum": [
+                "力量",
+                "敏捷",
+                "体质",
+                "感知",
+                "意志",
+                "魅力",
+                "学识",
+                "无"
+              ]
+            },
+            "原始骰点": {
+              "default": 1,
+              "type": "number"
+            },
+            "属性加值": {
+              "type": "number"
+            },
+            "难度减值": {
+              "type": "number"
+            },
+            "难度说明": {
+              "default": "常规难度",
+              "type": "string"
+            },
+            "总值": {
+              "type": "number"
+            },
+            "结果": {
+              "default": "失败",
+              "type": "string",
+              "enum": [
+                "大成功",
+                "成功",
+                "失败",
+                "大失败"
+              ]
+            },
+            "结果描述": {
+              "default": "暂无检定",
+              "type": "string"
+            },
+            "封锁行为": {
+              "type": "string"
+            },
+            "封锁至轮次": {
+              "type": "number"
+            },
+            "更新时间": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "战利品": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "显示战利品": {
+          "type": "boolean"
+        },
+        "当前容器": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "description": "容器名"
+          },
+          "additionalProperties": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "类型": {
+                "default": "普通",
+                "type": "string",
+                "enum": [
+                  "普通",
+                  "高级"
+                ]
+              },
+              "已开启": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "最近获取": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "description": "物品名"
+          },
+          "additionalProperties": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "品质": {
+                "default": "通用",
+                "type": "string",
+                "enum": [
+                  "通用",
+                  "良好",
+                  "优秀",
+                  "机密",
+                  "实验",
+                  "收藏"
+                ]
+              },
+              "数量": {
+                "default": 1,
+                "type": "number"
+              },
+              "价值": {
+                "default": 1,
+                "type": "number"
+              }
+            }
+          }
+        },
+        "副本": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "已激活": {
+              "type": "boolean"
+            },
+            "副本名称": {
+              "type": "string"
+            },
+            "实验室等级": {
+              "default": "基础实验室",
+              "type": "string",
+              "enum": [
+                "基础实验室",
+                "被封锁的实验室",
+                "被封锁的机密实验室",
+                "被封锁的顶点实验室"
+              ]
+            },
+            "地图规模": {
+              "default": "小型",
+              "type": "string",
+              "enum": [
+                "小型",
+                "中型",
+                "大型"
+              ]
+            },
+            "房间总数": {
+              "type": "number"
+            },
+            "当前房间索引": {
+              "type": "number"
+            },
+            "已探索房间": {
+              "type": "number"
+            },
+            "最近房间": {
+              "type": "string"
+            },
+            "最近结算": {
+              "type": "string"
+            },
+            "房间列表": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "序号": {
+                    "default": 1,
+                    "type": "number"
+                  },
+                  "房间名": {
+                    "type": "string"
+                  },
+                  "房间类型": {
+                    "default": "一般",
+                    "type": "string",
+                    "enum": [
+                      "一般",
+                      "不错",
+                      "危险",
+                      "隐藏"
+                    ]
+                  },
+                  "容器": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "普通": {
+                        "type": "number"
+                      },
+                      "高级": {
+                        "type": "number"
+                      },
+                      "上锁": {
+                        "type": "boolean"
+                      },
+                      "已搜索": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "仓库": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "联合币": {
+              "type": "number"
+            },
+            "芯片": {
+              "type": "number"
+            },
+            "物品": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "description": "物品名"
+              },
+              "additionalProperties": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "品质": {
+                    "default": "通用",
+                    "type": "string",
+                    "enum": [
+                      "通用",
+                      "良好",
+                      "优秀",
+                      "机密",
+                      "实验",
+                      "收藏"
+                    ]
+                  },
+                  "数量": {
+                    "type": "number"
+                  },
+                  "价值": {
+                    "default": 1,
+                    "type": "number"
+                  },
+                  "分类": {
+                    "default": "杂项",
+                    "type": "string"
+                  },
+                  "描述": {
+                    "type": "string"
+                  },
+                  "词条": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "可交易": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "独特收藏品": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "战场日志": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "description": "日志标题"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "description": "日志内容"
+      }
+    }
+  }
+}

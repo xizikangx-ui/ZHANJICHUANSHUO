@@ -1,0 +1,23 @@
+﻿:root {
+  --c-bg: #f6f3ea;
+  --c-panel: #fffdf8;
+  --c-line: #25333a;
+  --c-sub: #5d666e;
+  --c-accent: #b65232;
+  --c-accent-soft: #f1d9cf;
+  --font-main: 'LXGW WenKai', 'Noto Serif SC', 'Source Han Serif SC', 'Microsoft YaHei', serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 100%;
+  background: radial-gradient(circle at top right, #fff8f1 0%, var(--c-bg) 65%);
+  color: var(--c-line);
+  font-family: var(--font-main);
+  line-height: 1.55;
+}

@@ -1,0 +1,16 @@
+﻿# yaml-language-server: $schema=https://testingcf.jsdelivr.net/gh/StageDog/tavern_sync/dist/schema/settings.zh.json
+
+user名称: 青空黎
+
+配置:
+  角色卡示例:
+    类型: 角色卡
+    酒馆中的名称: 呕吐内心的少女
+    本地文件路径: 示例/角色卡示例/index
+    导出文件路径: 示例/角色卡示例/角色卡示例
+
+  天启黎明:
+    类型: 角色卡
+    酒馆中的名称: 天启黎明
+    本地文件路径: src/天启黎明/index
+    导出文件路径: src/天启黎明/天启黎明

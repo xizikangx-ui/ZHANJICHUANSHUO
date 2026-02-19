@@ -1,0 +1,10 @@
+[mcp_servers.chrome-devtools]
+command = "cmd"
+args = [
+    "/c",
+    "pnpx",
+    "chrome-devtools-mcp@latest",
+    "--autoConnect",
+]
+env = { SystemRoot="C:\\Windows", PROGRAMFILES="C:\\Program Files" }
+startup_timeout_ms = 20_000

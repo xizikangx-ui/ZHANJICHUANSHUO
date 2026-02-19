@@ -32,6 +32,7 @@
 
       - 名称: '[initvar]变量初始化勿开'
         启用: false
+        激活概率: 0
         激活策略:
           类型: 蓝灯
         插入位置:
@@ -381,8 +382,8 @@
 
     - 正则名称: '[隐藏]仅显示状态栏'
       id: 6d2b6ef6-4f3d-4a1f-8f3b-9b0b6fd0f1d7
-      启用: true
-      查找表达式: /[\s\S]+/g
+      启用: false
+      查找表达式: /^(?![\s\S]*<StatusPlaceHolderImpl\/>)[\s\S]+$/g
       内容: <StatusPlaceHolderImpl/>
       来源:
         用户输入: false
@@ -394,6 +395,25 @@
     - 正则名称: '[界面]前端界面状态栏'
       id: b50d0bed-ff40-4a25-9ada-14feb4283324
       启用: true
+      查找表达式: <StatusPlaceHolderImpl/>
+      内容: |-
+        ```
+        <body>
+        <script>
+        $('body').load('https://testingcf.jsdelivr.net/gh/xizikangx-ui/limingchuanshuo@main/dist/天启黎明/界面/状态栏/index.html')
+        </script>
+        </body>
+        ```
+      来源:
+        用户输入: false
+        AI输出: true
+      作用于:
+        仅格式显示: true
+        仅格式提示词: false
+
+    - 正则名称: '[严禁打开！！！！]'
+      id: 0fa3d6a6-0cd9-4b9f-9f14-4ed7f78bfcc2
+      启用: false
       查找表达式: <StatusPlaceHolderImpl/>
       内容: |-
         ```
@@ -425,5 +445,6 @@
         类型: 脚本
         内容: |-
           import 'http://localhost:5500/dist/天启黎明/脚本/变量结构/index.js';
+
 
 

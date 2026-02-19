@@ -573,6 +573,14 @@ function ensureNpcData(stat_data: any): void {
   });
 }
 
+function resetNpcStateBeforeCreate(stat_data: any): void {
+  if (!stat_data || typeof stat_data !== 'object') return;
+  if (Boolean(_.get(stat_data, '界面.建卡.已开始', false))) return;
+  _.set(stat_data, '界面.在场角色', []);
+  _.set(stat_data, '世界.长期NPC列表', {});
+  _.set(stat_data, '世界.NPC关系追踪', {});
+}
+
 function clampAffection(value: unknown, fallback = 0): number {
   return _.clamp(asNumber(value, fallback), -200, 1000);
 }
@@ -1713,6 +1721,46 @@ function advanceWorldTimeByAction(stat_data: any, content: string): void {
   _.set(stat_data, '世界.近期事务.时间推进', `${prev_text || formatUnionDateTime(prev_date)} -> ${next_text}（${reason}）`);
 }
 
+const player_background_trigger_pattern = /(我的背景|角色背景|人物背景|身世|来历|经历|过去|设定如下|背景如下)/;
+const player_background_strip_pattern = /武器|装备|能力|技能|灵装|道具|神器|无敌|神格|权柄之主/;
+
+function summarizePlayerBackground(raw: string): string {
+  const text = String(raw ?? '')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+  if (!text) return '';
+
+  const lines = text
+    .split('\n')
+    .map(v => v.trim())
+    .filter(Boolean)
+    .filter(v => !player_background_strip_pattern.test(v));
+
+  const merged = lines.join(' ');
+  if (!merged) return '';
+  return merged.length > 180 ? `${merged.slice(0, 180)}...` : merged;
+}
+
+function applyPlayerBackgroundInput(stat_data: any, content: string): boolean {
+  const source = String(content ?? '').trim();
+  if (!source) return false;
+  if (!player_background_trigger_pattern.test(source)) return false;
+  if (source.length < 24) return false;
+
+  const cleaned = source
+    .replace(/^.*?(我的背景|角色背景|人物背景|身世|来历|经历|过去|设定如下|背景如下)[:：]?\s*/i, '')
+    .trim();
+  const raw = cleaned || source;
+  const summary = summarizePlayerBackground(raw);
+  if (!summary) return false;
+
+  _.set(stat_data, '主角.背景.原文', raw);
+  _.set(stat_data, '主角.背景.摘要', summary);
+  _.set(stat_data, '世界.近期事务.背景更新', `玩家补充背景：${summary}`);
+  return true;
+}
+
 function buildOutcomePrompt(outcome: SkillOutcome, game_over: boolean): string {
   const lines = [
     '[系统检定反馈-必须执行]',
@@ -1785,6 +1833,7 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   const skill_result = toShortText(_.get(stat, '主角.技能检定.结果', '无'));
   const skill_attr = toShortText(_.get(stat, '主角.技能检定.关联属性', '无'));
   const skill_total = toInt(_.get(stat, '主角.技能检定.总值', 0), 0);
+  const bg_summary = toShortText(_.get(stat, '主角.背景.摘要', ''), '');
 
   const recent_affairs = pickTailEntries(_.get(stat, '世界.近期事务', {}), 2);
   const recent_logs = pickTailEntries(_.get(stat, '战场日志', {}), 2);
@@ -1798,6 +1847,9 @@ function buildMvuSummaryPrompt(chat_data: any): string {
     `成长: 战姬老练=${warmaid_lv} | 权柄等级=${authority_lv} | 魔力碎片=${magic_shard}(下级需${next_magic_shard}) | 权柄碎片=${authority_shard} | 权柄本源=${has_origin ? '有' : '无'}`,
     `检定: 最近=${skill_result} | 属性=${skill_attr} | 总值=${skill_total}`,
   ];
+  if (bg_summary) {
+    lines.push(`主角背景摘要: ${bg_summary}`);
+  }
 
   if (recent_affairs.length > 0) {
     lines.push(`近期事务: ${recent_affairs.map(([k, v]) => `${k}:${v}`).join('；')}`);
@@ -1851,6 +1903,8 @@ $(() => {
       next_data.stat_data = _.isObjectLike(next_data?.stat_data) ? _.cloneDeep(next_data.stat_data) : {};
       ensureAirCombatData(next_data.stat_data);
       ensureNpcData(next_data.stat_data);
+      resetNpcStateBeforeCreate(next_data.stat_data);
+      applyPlayerBackgroundInput(next_data.stat_data, source_content);
       advanceWorldTimeByAction(next_data.stat_data, source_content);
       const user_npc_request_hit = applyUserNpcRequest(next_data.stat_data, source_content);
 
@@ -1948,6 +2002,7 @@ $(() => {
         }
         ensureAirCombatData(new_data.stat_data);
         ensureNpcData(new_data.stat_data);
+        resetNpcStateBeforeCreate(new_data.stat_data);
         if (!new_data.stat_data.界面 || typeof new_data.stat_data.界面 !== 'object') {
           new_data.stat_data.界面 = {};
         }

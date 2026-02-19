@@ -35,6 +35,15 @@
         </label>
 
         <label class="field">
+          <span>性别：</span>
+          <select v-model="create_form.性别" :disabled="create_form.职业 === '战姬'">
+            <option value="男性">男性</option>
+            <option value="女性">女性</option>
+          </select>
+        </label>
+        <p v-if="create_form.职业 === '战姬'" class="tip">战姬角色性别固定为女性。</p>
+
+        <label class="field">
           <span>年龄：</span>
           <input v-model.number="create_form.年龄" type="number" :min="age_limit.min" :max="age_limit.max" />
         </label>
@@ -220,6 +229,20 @@
       <section v-if="display_floor_text" class="mvu-textbox">
         <h2>MVU正文</h2>
         <pre class="mvu-body">{{ display_floor_text }}</pre>
+      </section>
+      <section class="next-actions">
+        <h2>接下来可进行</h2>
+        <div class="next-actions-grid">
+          <button
+            v-for="action in next_action_options"
+            :key="action"
+            type="button"
+            class="next-action-btn"
+            @click="send_next_action(action)"
+          >
+            {{ action }}
+          </button>
+        </div>
       </section>
       <section v-if="data.界面.游戏结束.已结束" class="gameover-banner">
         <h2>本局已结束</h2>
@@ -465,6 +488,7 @@ import { useDataStore } from './store';
 type Profession = '指挥官' | '战姬' | '权柄使役者';
 type WarmaidType = '侦察型' | '轻型' | '中型' | '重型' | '要塞型' | '地面支援姬';
 type CreateStage = 'cover' | 'profile' | 'human' | 'abilities' | 'profession' | 'background' | 'warmaid';
+type Gender = '男性' | '女性';
 type HumanKey = '力量' | '敏捷' | '体质' | '感知' | '意志' | '魅力' | '学识';
 type WarmaidAttrKey = '魔力评级' | '力量加成' | '体质加成' | '抗污染值' | '飞行速度' | '防御评级';
 type AbilityItem = { name: string; desc: string; source: string };
@@ -482,6 +506,12 @@ const display_floor_text = computed(() => {
   if (direct) return direct;
   return extractFloorTextFromRaw(String(data.value.界面.楼层文本.原文 ?? ''));
 });
+const next_action_options = [
+  '前往报到处完成登记',
+  '查看学院地图并确认任务点',
+  '向教官申请首次训练',
+  '与在场角色进行交流',
+];
 const onstage_characters = computed(() => {
   const list = data.value.界面.在场角色;
   return Array.isArray(list) ? list : [];
@@ -647,6 +677,7 @@ const create_form = reactive({
   角色姓名: '',
   职业: '指挥官' as Profession,
   战姬类型: '轻型' as WarmaidType,
+  性别: '男性' as Gender,
   年龄: 21,
 });
 const selected_warmaid_skills = ref<string[]>([]);
@@ -842,6 +873,7 @@ watch(
   () => create_form.职业,
   () => {
     create_form.年龄 = _.clamp(Number(create_form.年龄) || age_limit.value.min, age_limit.value.min, age_limit.value.max);
+    if (create_form.职业 === '战姬') create_form.性别 = '女性';
     const valid_ability_names = new Set(current_base_abilities.value.map(v => v.name));
     selected_abilities.value = selected_abilities.value.filter(name => valid_ability_names.has(name));
     selected_warmaid_skills.value = [];
@@ -871,6 +903,7 @@ watchEffect(() => {
   create_form.角色姓名 = saved.角色姓名 || '';
   create_form.职业 = saved.职业;
   create_form.战姬类型 = saved.战姬类型;
+  create_form.性别 = (saved as any).性别 === '女性' ? '女性' : create_form.职业 === '战姬' ? '女性' : '男性';
   create_form.年龄 = saved.年龄;
   cheat_mode.value = Boolean(saved.作弊模式);
 });
@@ -1215,11 +1248,13 @@ function finish_create(): void {
     角色姓名: name,
     职业: create_form.职业,
     战姬类型: create_form.战姬类型,
+    性别: create_form.职业 === '战姬' ? '女性' : create_form.性别,
     年龄: Number(create_form.年龄),
     作弊模式: cheat_mode.value,
   };
 
   data.value.主角.档案.代号 = name;
+  _.set(data.value, '主角.档案.性别', create_form.职业 === '战姬' ? '女性' : create_form.性别);
   data.value.主角.档案.身份路径 = create_form.职业 === '战姬' ? `战姬-${create_form.战姬类型}` : create_form.职业;
 
   data.value.主角.人类属性 = { ...human_attr };
@@ -1387,6 +1422,49 @@ function toggle_transform(): void {
   if (next) {
     data.value.主角.灵装化.上次结算轮次 = data.value.主角.战术.当前轮次;
   }
+}
+
+function send_next_action(action: string): void {
+  const ok = window.confirm(`确定吗？\n将发送：${action}`);
+  if (!ok) return;
+
+  const docs: Document[] = [];
+  docs.push(window.document);
+  try {
+    if (window.parent?.document && window.parent.document !== window.document) docs.push(window.parent.document);
+  } catch {}
+  try {
+    if (window.top?.document && window.top.document !== window.document) docs.push(window.top.document);
+  } catch {}
+
+  const textarea_selectors = ['#send_textarea', 'textarea#send_textarea', 'textarea[id*=\"send\"]', 'textarea'];
+  const send_btn_selectors = ['#send_but', 'button#send_but', '#send-button', 'button[type=\"submit\"]'];
+
+  for (const doc of docs) {
+    let input_el: HTMLTextAreaElement | null = null;
+    for (const sel of textarea_selectors) {
+      const el = doc.querySelector(sel);
+      if (el instanceof HTMLTextAreaElement) {
+        input_el = el;
+        break;
+      }
+    }
+    if (!input_el) continue;
+
+    input_el.value = action;
+    input_el.dispatchEvent(new Event('input', { bubbles: true }));
+    input_el.dispatchEvent(new Event('change', { bubbles: true }));
+
+    for (const sel of send_btn_selectors) {
+      const btn = doc.querySelector(sel);
+      if (btn instanceof HTMLElement) {
+        btn.click();
+        return;
+      }
+    }
+  }
+
+  alert('未找到酒馆输入框或发送按钮，请手动发送。');
 }
 </script>
 
@@ -1606,6 +1684,33 @@ function toggle_transform(): void {
   padding: 12px;
   border-bottom: 1px dashed #7d8a90;
   background: #fffef8;
+}
+.next-actions {
+  padding: 12px;
+  border-bottom: 1px dashed #7d8a90;
+  background: #f8fcff;
+}
+.next-actions h2 {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: var(--c-accent);
+}
+.next-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.next-action-btn {
+  border: 1px solid #53626a;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #2d3f49;
+  font-size: 12px;
+  text-align: left;
+}
+.next-action-btn:hover {
+  background: #edf4f9;
 }
 .onstage-box {
   padding: 12px;
@@ -1863,6 +1968,9 @@ article h3,
   }
   .tabs {
     flex-wrap: wrap;
+  }
+  .next-actions-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

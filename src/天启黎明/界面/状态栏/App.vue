@@ -253,6 +253,7 @@
         <div>
           <h1>天启黎明</h1>
           <p>{{ data.主角.档案.代号 }} | {{ profession }} | {{ data.主角.档案.身份路径 }}</p>
+          <p>性别: {{ display_gender }}</p>
         </div>
         <div class="hero-controls">
           <span class="threat">威胁: {{ data.世界.战区威胁等级 }}</span>
@@ -757,6 +758,11 @@ const profession = computed<Profession>(() => {
   if (data.value.主角.档案.身份路径.includes('权柄')) return '权柄使役者';
   return '指挥官';
 });
+const display_gender = computed(() => {
+  const raw = String((data.value as any).主角?.档案?.性别 ?? '').trim();
+  if (raw) return raw;
+  return profession.value === '战姬' ? '女性' : '未设定';
+});
 
 const is_warmaid = computed(() => profession.value === '战姬');
 
@@ -956,15 +962,36 @@ function build_next_actions_from_reply(text: string): string[] {
   pushUnique('进行一次谨慎侦察行动');
   pushUnique('根据当前局势推进主线任务');
 
-  return pool.slice(0, 4);
+  return ensure_four_actions(pool.slice(0, 4));
+}
+
+function ensure_four_actions(list: string[]): string[] {
+  const result: string[] = [];
+  for (const item of list) {
+    const t = String(item ?? '').trim();
+    if (!t) continue;
+    if (!result.includes(t)) result.push(t);
+    if (result.length >= 4) return result;
+  }
+  for (const item of default_next_action_options) {
+    if (!result.includes(item)) result.push(item);
+    if (result.length >= 4) break;
+  }
+  return result.slice(0, 4);
 }
 
 watch(
   () => display_floor_text.value,
   (val) => {
-    next_action_options.value = build_next_actions_from_reply(String(val ?? ''));
+    next_action_options.value = ensure_four_actions(build_next_actions_from_reply(String(val ?? '')));
   },
   { immediate: true },
+);
+watch(
+  () => Number((data.value as any).界面?.楼层文本?.更新时间 ?? 0),
+  () => {
+    next_action_options.value = ensure_four_actions(build_next_actions_from_reply(display_floor_text.value));
+  },
 );
 
 function change_human(key: HumanKey, delta: number): void {

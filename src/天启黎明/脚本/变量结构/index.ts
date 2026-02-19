@@ -851,6 +851,75 @@ function applyVivianaArc(stat_data: any): void {
   }
 }
 
+function sanitizeThoughtText(raw: string): string {
+  const thought = String(raw ?? '').trim();
+  if (!thought) return '';
+  if (/作为AI|我无法|系统提示|规则要求|标签|JSON|变量|mvu|statusplaceholder/i.test(thought)) {
+    return '';
+  }
+  return thought.slice(0, 120);
+}
+
+function buildPersonaInnerThought(name: string, score: number, is_partner: boolean, fallback: string): { attitude: string; thought: string } {
+  const clean_fallback = sanitizeThoughtText(fallback);
+
+  if (/维多利伽|victorica/i.test(name)) {
+    if (is_partner) return { attitude: '伴侣（成熟克制）', thought: '她把亲密放在“并肩生存”之后，不索取承诺，只用行动守住彼此的退路。' };
+    if (score >= 601) return { attitude: '深度信任', thought: '她愿意把你纳入她的长期计划，但依旧保持对风险与损失的冷静估算。' };
+    if (score >= 401) return { attitude: '可靠同伴', thought: '她把你视作能托付后背的人，交流更直接，也更重视行动结果。' };
+    if (score >= 101) return { attitude: '谨慎友好', thought: '她开始主动共享情报与判断，但仍会先确认你是否准备好承担后果。' };
+    if (score >= 1) return { attitude: '克制合作', thought: '她仍有戒备，却愿意给你一次被验证的机会。' };
+    return { attitude: '警戒疏离', thought: '她先确认撤离路线与掩体，再决定是否回应你的提议。' };
+  }
+
+  if (/梅莉|梅莉·冯·塔尔思科/i.test(name)) {
+    if (is_partner) return { attitude: '伴侣（成熟克制）', thought: '她将情感表达压进理性与分寸里，优先维护共同目标与边界。' };
+    if (score >= 601) return { attitude: '深度信任', thought: '她会让你参与核心决策，但仍以严谨标准要求每一步推演。' };
+    if (score >= 401) return { attitude: '高信赖协作', thought: '她把你视作可长期协同的对象，愿意共享研究进展与战术判断。' };
+    if (score >= 101) return { attitude: '礼貌亲近', thought: '她的语气更温和，但核心思路依旧是精确、可验证与可执行。' };
+    if (score >= 1) return { attitude: '克制友善', thought: '她愿意交流，但会先观察你是否具备稳定执行力。' };
+    return { attitude: '审慎观望', thought: '她在判断你是短期变量，还是值得纳入长期布局的对象。' };
+  }
+
+  if (clean_fallback) {
+    return { attitude: '中立', thought: clean_fallback };
+  }
+  return { attitude: '中立', thought: '她在衡量局势与你的选择，尚未给出明确立场。' };
+}
+
+function applyNpcPersonaConsistency(stat_data: any): void {
+  const onstage = (_.get(stat_data, '界面.在场角色', []) as OnStageCharacter[]) ?? [];
+  const long_map = (_.get(stat_data, '世界.长期NPC列表', {}) as Record<string, any>) ?? {};
+  const all_names = _.uniq([
+    ...onstage.map(v => String(v?.姓名 ?? '')),
+    ...Object.keys(long_map),
+  ]).filter(Boolean);
+
+  for (const name of all_names) {
+    const long_key = `世界.长期NPC列表.${name}`;
+    const long_npc = _.get(stat_data, long_key, {});
+    const score = clampAffection(_.get(long_npc, '好感度', 0), 0);
+    const tags = _.get(long_npc, '关系标签', []);
+    const is_partner = String(_.get(long_npc, '好感阶段', '')) === '伴侣' || (Array.isArray(tags) && tags.includes('伴侣'));
+    const fallback = String(_.get(long_npc, '内心想法', '') || onstage.find(v => v.姓名 === name)?.内心想法 || '');
+    const persona = buildPersonaInnerThought(name, score, is_partner, fallback);
+
+    if (_.has(stat_data, long_key)) {
+      _.set(stat_data, `${long_key}.态度`, persona.attitude);
+      _.set(stat_data, `${long_key}.内心想法`, persona.thought);
+      _.set(stat_data, `${long_key}.最后更新时间`, Date.now());
+      if (is_partner) _.set(stat_data, `${long_key}.好感阶段`, '伴侣');
+    }
+
+    const idx = onstage.findIndex(v => String(v?.姓名 ?? '') === name);
+    if (idx >= 0) {
+      onstage[idx].态度 = persona.attitude;
+      onstage[idx].内心想法 = `本回合：${persona.thought}`;
+      onstage[idx].更新时间 = Date.now();
+    }
+  }
+}
+
 const dungeon_enter_pattern = /进入副本|进入希尔顿实验室|开始副本|副本探索|下副本|进入实验室/i;
 const dungeon_leave_pattern = /离开副本|副本结束|撤离副本|通关副本|退出实验室/i;
 const dungeon_move_pattern = /前往|推进|移动到|去往|转移到|深入|进入房间/i;
@@ -1913,6 +1982,7 @@ $(() => {
       applyDungeonLootSystem(next_data.stat_data, source_content);
       applyBlackMarketTrade(next_data.stat_data, source_content);
       applyVivianaArc(next_data.stat_data);
+      applyNpcPersonaConsistency(next_data.stat_data);
       applyHumanTraining(next_data.stat_data, source_content);
       reconcileGrowthLevel(next_data.stat_data);
       const battle_started = startAirBattleIfTriggered(next_data.stat_data, source_content);
@@ -2068,6 +2138,7 @@ $(() => {
         enforceGameOver(new_data.stat_data, '生命值归零，本局立即结束。');
         applyNpcLongTermRules(new_data.stat_data, content, user_context, incoming_onstage, relation_hints);
         applyVivianaArc(new_data.stat_data);
+        applyNpcPersonaConsistency(new_data.stat_data);
 
         new_data.stat_data.界面.楼层文本 = {
           正文: extractDisplayText(content),

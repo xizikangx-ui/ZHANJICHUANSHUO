@@ -87,6 +87,10 @@
               "好感度": {
                 "type": "number"
               },
+              "等级": {
+                "default": "新手",
+                "type": "string"
+              },
               "态度": {
                 "default": "中立",
                 "type": "string"
@@ -255,6 +259,10 @@
               },
               "好感度": {
                 "type": "number"
+              },
+              "等级": {
+                "default": "新手",
+                "type": "string"
               },
               "好感阶段": {
                 "default": "警惕",

@@ -29,6 +29,7 @@
               .object({
                 姓名: z.string().prefault('未命名'),
                 好感度: z.coerce.number().transform(v => _.clamp(v, -200, 1000)).prefault(0),
+                等级: z.string().prefault('新手'),
                 态度: z.string().prefault('中立'),
                 内心想法: z.string().prefault(''),
                 基础属性: z.record(z.string().describe('属性名'), z.coerce.number().prefault(0)).prefault({}),
@@ -85,6 +86,7 @@
           z.object({
             姓名: z.string().prefault('未命名'),
             好感度: z.coerce.number().transform(v => _.clamp(v, -200, 1000)).prefault(0),
+            等级: z.string().prefault('新手'),
             好感阶段: z.enum(['死敌', '危险', '警惕', '熟悉', '朋友', '挚友', '亲密', '伴侣']).prefault('警惕'),
             态度: z.string().prefault('中立'),
             内心想法: z.string().prefault(''),

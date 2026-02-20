@@ -356,6 +356,7 @@ function extractDisplayText(content: string): string {
 type OnStageCharacter = {
   姓名: string;
   好感度: number;
+  等级: string;
   态度: string;
   内心想法: string;
   基础属性: Record<string, number>;
@@ -481,6 +482,7 @@ function inferOnStageCharactersFromText(content: string, options?: { exclude_nam
     result.push({
       姓名: name,
       好感度: clampAffection(old?.好感度 ?? 0, 0),
+      等级: String((old as any)?.等级 ?? '新手'),
       态度: old?.态度 || inferAttitudeByContext(context),
       内心想法: old?.内心想法 || (context ? `从当前楼层推断：${context}` : '从当前楼层推断中。'),
       基础属性: _.isObjectLike(old?.基础属性) ? _.cloneDeep(old?.基础属性) : {},
@@ -508,6 +510,7 @@ function parseOnStageCharacters(content: string): OnStageCharacter[] | undefined
         return {
           姓名: String((item as any).姓名 ?? '未命名'),
           好感度: _.clamp(asNumber((item as any).好感度, 0), -200, 1000),
+          等级: String((item as any).等级 ?? '新手'),
           态度: String((item as any).态度 ?? '中立'),
           内心想法: String((item as any).内心想法 ?? ''),
           基础属性: normalized_attrs,
@@ -602,6 +605,7 @@ function mergeOnStageCharacters(old_list: OnStageCharacter[], incoming: OnStageC
     merged_map.set(old.姓名, {
       姓名: String(old.姓名 || '未命名'),
       好感度: clampAffection(old.好感度, 0),
+      等级: String((old as any).等级 || '新手'),
       态度: String(old.态度 || '中立'),
       内心想法: String(old.内心想法 || ''),
       基础属性: _.isObjectLike(old.基础属性) ? _.cloneDeep(old.基础属性) : {},
@@ -615,6 +619,7 @@ function mergeOnStageCharacters(old_list: OnStageCharacter[], incoming: OnStageC
       merged_map.set(name, {
         姓名: name,
         好感度: clampAffection(next.好感度, 0),
+        等级: String((next as any).等级 || '新手'),
         态度: String(next.态度 || '中立'),
         内心想法: String(next.内心想法 || ''),
         基础属性: _.isObjectLike(next.基础属性) ? _.cloneDeep(next.基础属性) : {},
@@ -627,6 +632,7 @@ function mergeOnStageCharacters(old_list: OnStageCharacter[], incoming: OnStageC
     merged_map.set(name, {
       姓名: name,
       好感度: clampAffection(merged_affection, prev.好感度),
+      等级: String((next as any).等级 || (prev as any).等级 || '新手'),
       态度: String(next.态度 || prev.态度 || '中立'),
       内心想法: String(next.内心想法 || prev.内心想法 || ''),
       基础属性: {
@@ -669,6 +675,7 @@ function upsertLongTermNpc(stat_data: any, name: string, payload?: Partial<OnSta
   const base = _.isObjectLike(existing) ? existing : {
     姓名: name,
     好感度: 0,
+    等级: '新手',
     好感阶段: '警惕',
     态度: '中立',
     内心想法: '',
@@ -687,6 +694,7 @@ function upsertLongTermNpc(stat_data: any, name: string, payload?: Partial<OnSta
     ...base,
     姓名: name,
     好感度: merged_affection,
+    等级: String((payload as any)?.等级 || base.等级 || '新手'),
     态度: String(payload?.态度 || base.态度 || '中立'),
     内心想法: String(payload?.内心想法 || base.内心想法 || ''),
     基础属性: {

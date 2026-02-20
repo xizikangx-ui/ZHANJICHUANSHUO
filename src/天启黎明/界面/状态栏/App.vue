@@ -450,6 +450,7 @@
           <li v-for="char in onstage_characters" :key="char.姓名">
             <div class="onstage-head">
               <strong>{{ char.姓名 }}</strong>
+              <span>等级 {{ char.等级 || '新手' }}</span>
               <span>好感度 {{ char.好感度 }}</span>
               <span>态度 {{ char.态度 }}</span>
             </div>
@@ -470,6 +471,7 @@
           <li v-for="npc in longterm_npc_list" :key="npc.姓名">
             <div class="onstage-head">
               <strong>{{ npc.姓名 }}</strong>
+              <span>等级 {{ npc.等级 || '新手' }}</span>
               <span>好感度 {{ npc.好感度 }}</span>
               <span>阶段 {{ npc.好感阶段 }}</span>
               <span>态度 {{ npc.态度 }}</span>

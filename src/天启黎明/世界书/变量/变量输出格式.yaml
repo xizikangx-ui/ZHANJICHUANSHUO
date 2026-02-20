@@ -1,12 +1,13 @@
 ﻿---
 变量输出格式:
   rule:
-    - 回复末尾必须包含 <UpdateVariable>...</UpdateVariable>，内部使用 JSONPatch。
+    - 优先在回复末尾包含 <UpdateVariable>...</UpdateVariable>（JSONPatch）；若当轮未输出标签，允许自然叙事，由桥接脚本做保底解析。
     - 允许 op: replace / delta / insert / remove / move。
     - path 必须使用当前字段名（如 世界.当前时间 / 世界.当前地点），禁止旧字段。
     - 推荐追加 <OnStageCharacters>JSON</OnStageCharacters>。
     - 可选追加 <NpcRelationHints>JSON</NpcRelationHints> 作为关系标签辅助。
     - OnStageCharacters.好感度 单次上升不得超过 +5（下降不受此限制）。
+    - 文风要求：自然叙事优先，不要机械复读变量字段与规则条文。
 
   onstage_example: |-
     <OnStageCharacters>

@@ -955,6 +955,26 @@ function build_next_actions_from_reply(text: string): string[] {
     if (!pool.includes(s)) pool.push(s);
   };
 
+  const direct_candidates = Array.from(
+    new Set(
+      t
+        .split(/\n|。|！|!|？|\?/)
+        .map(v => v.trim())
+        .filter(Boolean)
+        .flatMap((line) => {
+          const out: string[] = [];
+          const m1 = line.match(/(?:你可以|可选择|建议你|下一步可|接下来可|你将|你决定)([^，。；\n]{3,24})/);
+          if (m1?.[1]) out.push(m1[1]);
+          const m2 = line.match(/(?:前往|调查|申请|进入|确认|整理|查看|联系|汇报|推进|训练|休整)[^，。；\n]{2,24}/);
+          if (m2?.[0]) out.push(m2[0]);
+          return out;
+        })
+        .map(v => v.replace(/^[：:、，\s]+/, '').replace(/[：:、，\s]+$/, ''))
+        .filter(v => v.length >= 4 && v.length <= 22),
+    ),
+  );
+  for (const candidate of direct_candidates) pushUnique(candidate);
+
   if (/报到|学院|新生|教官|训练/.test(t)) {
     pushUnique('前往报到处补全入学手续');
     pushUnique('向教官申请进行首次适配训练');
@@ -977,6 +997,23 @@ function build_next_actions_from_reply(text: string): string[] {
   }
   if (/交易|黑市|物资|联合币/.test(t)) {
     pushUnique('整理仓库并评估黑市交易方案');
+  }
+
+  const current_stage = String((data.value as any).世界?.新手引导?.阶段 ?? '');
+  if (current_stage === '入学手续') {
+    pushUnique('提交身份核验并完成报到登记');
+    pushUnique('参加首次链路适配测试');
+  } else if (current_stage === '课程周') {
+    pushUnique('参加异种学基础课程');
+    pushUnique('进行模拟侦察训练');
+  } else if (current_stage === '希尔顿试验室任务') {
+    pushUnique('领取最低难度希尔顿试验室任务');
+    pushUnique('整备后前往试验室入口');
+  }
+
+  const first_npc = String((onstage_characters.value?.[0] as any)?.姓名 ?? '').trim();
+  if (first_npc) {
+    pushUnique(`向${first_npc}询问当前局势`);
   }
 
   // fallback
@@ -1015,6 +1052,14 @@ watch(
   () => Number((data.value as any).界面?.楼层文本?.更新时间 ?? 0),
   () => {
     const source = String(display_floor_text.value ?? '').trim() || String(data.value.界面?.楼层文本?.原文 ?? '');
+    next_action_options.value = ensure_four_actions(build_next_actions_from_reply(source));
+  },
+);
+watch(
+  () => String((data.value as any).界面?.楼层文本?.原文 ?? ''),
+  (raw) => {
+    if (!raw) return;
+    const source = String(display_floor_text.value ?? '').trim() || raw;
     next_action_options.value = ensure_four_actions(build_next_actions_from_reply(source));
   },
 );

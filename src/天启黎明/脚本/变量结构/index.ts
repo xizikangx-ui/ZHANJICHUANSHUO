@@ -170,9 +170,20 @@ function ensureAirCombatData(stat_data: any): void {
   }
 }
 
-const battle_activate_pattern = /空战|超视距空战|偷袭|攻击|灵装化后攻击|异种进攻/i;
+const battle_activate_pattern = /空战|超视距空战|偷袭|灵装化后攻击|异种进攻|敌袭|遭遇战|进入战斗/i;
 const battle_action_pattern = /攻击|射击|开火|突击|轰炸|压制|反击|偷袭|超视距空战|异种进攻|近战/i;
 const battle_end_pattern = /战斗结束|结束空战|脱离接触|脱战|全歼|击退|撤退|撤离/i;
+const battle_hostile_pattern = /异种|敌人|敌军|敌对|领主|巢穴|袭击|警报|交火|接敌|战场/i;
+const explicit_battle_open_pattern = /开始战斗|进入战斗|遭遇战|交战状态|空战开始|地面战开始|异种进攻|敌袭/i;
+
+function isBattleTriggerContent(content: string): boolean {
+  const text = String(content ?? '');
+  if (!text.trim()) return false;
+  if (explicit_battle_open_pattern.test(text)) return true;
+  if (battle_activate_pattern.test(text) && battle_hostile_pattern.test(text)) return true;
+  if (/(开火|射击|突击|压制|反击|轰炸|近战)/i.test(text) && battle_hostile_pattern.test(text)) return true;
+  return false;
+}
 
 function getWeaponLevel(stat_data: any): number {
   const weapons = _.get(stat_data, '主角.装备.武器', {});
@@ -189,7 +200,7 @@ function buildAirBattleSummary(stat_data: any, end_reason: string): string {
 
 function startAirBattleIfTriggered(stat_data: any, content: string): boolean {
   ensureAirCombatData(stat_data);
-  if (!battle_activate_pattern.test(content)) return false;
+  if (!isBattleTriggerContent(content)) return false;
 
   const in_battle = Boolean(_.get(stat_data, '主角.战术.是否战斗中', false));
   if (in_battle) return true;
@@ -1262,6 +1273,24 @@ function hasExplicitUpdateTag(content: string): boolean {
   return /<update(?:variable)?>[\s\S]*?<\/update(?:variable)?>|<update(?:variable)?>[\s\S]*$/im.test(content);
 }
 
+function lockCriticalStateWithoutTag(new_stat: any, old_stat: any): void {
+  if (!_.isObjectLike(new_stat)) return;
+  if (!_.isObjectLike(old_stat)) return;
+  const critical_paths = [
+    '主角.资源',
+    '主角.成长',
+    '主角.装备',
+    '主角.异常状态',
+    '战利品.仓库',
+  ];
+  for (const p of critical_paths) {
+    const old_val = _.get(old_stat, p);
+    if (old_val !== undefined) {
+      _.set(new_stat, p, _.cloneDeep(old_val));
+    }
+  }
+}
+
 function patchGameplayState(stat_data: any, content: string): void {
   if (!stat_data || typeof stat_data !== 'object') return;
 
@@ -1338,7 +1367,7 @@ function applyBattleSystemConstraints(stat_data: any, content: string): void {
   const threat = String(_.get(stat_data, '世界.战区威胁等级', ''));
   const line = String(_.get(stat_data, '主角.战术.当前阵线', '中线'));
   const in_battle_by_state = current_round > 1 || line === '前线' || line === '交锋区' || threat === '高' || threat === '极危';
-  const in_battle_by_text = /战斗|交战|接敌|开火|敌袭|突击|火力压制|回合|战场|异种来袭|进入战区/i.test(content);
+  const in_battle_by_text = isBattleTriggerContent(content);
   const in_battle = in_battle_by_state || in_battle_by_text;
 
   const mode = in_battle ? (mode_by_text === '非战斗' ? '空战' : mode_by_text) : '非战斗';
@@ -1512,6 +1541,41 @@ function inferDifficulty(content: string, attr: SkillAttr): { penalty: number; l
   return { penalty: Math.min(6, penalty), label: '超常难度' };
 }
 
+const low_impact_no_check_pattern = /推轮椅|推着轮椅|扶着|搀扶|递给|递上|打招呼|点头|挥手|走过去|跟上|简单搬动|轻轻推动|慢慢推行/i;
+const high_consequence_pattern = /破门|破墙|砸墙|高处|跳楼|爆破|高压|战斗|交战|接敌|异种|敌人|枪|炮|开火|潜入|偷窃|胁迫|威胁|生死|危险|致命|极端/i;
+const contested_action_pattern = /说服|交涉|谈判|恐吓|魅惑|审问|潜入|侦察|搜索|追踪|分析|研究|解读|解题|证明|翻译|手术|驾驶|拆弹/i;
+const explicit_check_pattern = /检定|判定|骰点|D10|掷骰/i;
+const avoid_risk_intent_pattern = /小心|谨慎|稳妥|避免|规避|不被发现|确保|尽量不|安全地|悄悄地|不惊动|不受伤|低风险|保护好/i;
+
+function inferConsequenceLevel(content: string): 0 | 1 | 2 {
+  const text = String(content ?? '');
+  if (/致命|生死|爆炸|坠落|极端|异种|敌袭|战斗|交火|枪|炮|高危|高空/i.test(text)) return 2;
+  if (/潜入|追踪|谈判|说服|威胁|手术|驾驶|拆弹|高难|复杂/i.test(text)) return 1;
+  return 0;
+}
+
+function shouldRequireSkillCheck(content: string, inferred_attr: SkillAttr): boolean {
+  const text = String(content ?? '').trim();
+  if (!text) return false;
+  if (explicit_check_pattern.test(text)) return true;
+  const avoid_intent = avoid_risk_intent_pattern.test(text);
+  if (low_impact_no_check_pattern.test(text) && !high_consequence_pattern.test(text)) return false;
+  if (isBattleTriggerContent(text)) return true;
+  if ((high_consequence_pattern.test(text) || contested_action_pattern.test(text)) && avoid_intent) return true;
+  if (inferred_attr === '学识' && /(考试|测验|证明|推导|解题|翻译|计算|公式|微积分|语法)/i.test(text) && avoid_intent) return true;
+  return false;
+}
+
+function hasRiskButNoAvoidIntent(content: string): boolean {
+  const text = String(content ?? '').trim();
+  if (!text) return false;
+  if (explicit_check_pattern.test(text)) return false;
+  if (isBattleTriggerContent(text)) return false; // 战斗内按战斗流程处理
+  const risky = high_consequence_pattern.test(text) || contested_action_pattern.test(text);
+  if (!risky) return false;
+  return !avoid_risk_intent_pattern.test(text);
+}
+
 type SkillOutcome = {
   attr: SkillAttr;
   action_tag: string;
@@ -1538,10 +1602,8 @@ type PendingSkillState = {
 };
 
 function resolveSkillOutcome(stat_data: any, content: string, raw_override?: number): SkillOutcome | undefined {
-  const has_explicit_check = /检定|判定|骰点/i.test(content);
-  const has_action_verb = /尝试|试图|开始|进行|执行|用力|发力|冲刺|推进|推开|推动|推车|搬运|举起|观察|侦察|搜索|说服|交涉|谈判|分析|研究|解读|抵抗|闪避|躲避|潜行|攀爬|投掷|聆听|san|图书馆|神秘学|历史|医学|数学|语文|英语|解题/i.test(content);
   const inferred_attr = inferSkillAttr(content);
-  const should_check = has_explicit_check || (has_action_verb && inferred_attr !== '无');
+  const should_check = shouldRequireSkillCheck(content, inferred_attr) && inferred_attr !== '无';
   if (!should_check) return undefined;
 
   const attr = inferred_attr;
@@ -1593,10 +1655,20 @@ function resolveSkillOutcome(stat_data: any, content: string, raw_override?: num
   let hp_loss = 0;
   let mp_loss = 0;
   if (result === '失败' || result === '大失败') {
-    const lock_rounds = result === '大失败' ? 4 : 2;
+    const consequence = inferConsequenceLevel(content);
+    const lock_rounds =
+      consequence === 2 ? (result === '大失败' ? 4 : 2)
+        : consequence === 1 ? (result === '大失败' ? 3 : 1)
+          : (result === '大失败' ? 2 : 1);
     lock_to_round = current_round + lock_rounds;
-    hp_loss = result === '大失败' ? 12 : 4;
-    mp_loss = result === '大失败' ? 15 : 5;
+    hp_loss =
+      consequence === 2 ? (result === '大失败' ? 12 : 4)
+        : consequence === 1 ? (result === '大失败' ? 8 : 2)
+          : (result === '大失败' ? 4 : 0);
+    mp_loss =
+      consequence === 2 ? (result === '大失败' ? 15 : 6)
+        : consequence === 1 ? (result === '大失败' ? 10 : 3)
+          : (result === '大失败' ? 5 : 1);
     desc += ` 你受到惩罚：生命-${hp_loss}，魔力-${mp_loss}，并在第 ${lock_to_round} 轮前无法重复该动作。`;
   }
 
@@ -1667,6 +1739,13 @@ function applyResolvedSkillOutcome(stat_data: any, content: string, outcome: Ski
 }
 
 function applySkillCheckSystem(stat_data: any, content: string): SkillOutcome | undefined {
+  if (hasRiskButNoAvoidIntent(content)) {
+    const tip = '该行动存在风险/代价或需要额外步骤。请先声明“如何规避风险”，再进行检定。';
+    _.set(stat_data, '世界.近期事务.风险提示', tip);
+    _.set(stat_data, `战场日志.风险提示-${Date.now()}`, tip);
+    trimBattleLogs(stat_data, 3);
+    return undefined;
+  }
   const outcome = resolveSkillOutcome(stat_data, content);
   if (!outcome) return undefined;
   applyResolvedSkillOutcome(stat_data, content, outcome);
@@ -1977,9 +2056,9 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   const path = toShortText(_.get(stat, '主角.档案.身份路径'));
 
   const hp = toInt(_.get(stat, '主角.资源.当前生命', 0), 0);
-  const hp_max = toInt(_.get(stat, '主角.资源.生命上限', hp), hp);
+  const hp_max = toInt(_.get(stat, '主角.资源.最大生命', _.get(stat, '主角.资源.生命上限', hp)), hp);
   const mp = toInt(_.get(stat, '主角.资源.当前魔力', 0), 0);
-  const mp_max = toInt(_.get(stat, '主角.资源.魔力上限', mp), mp);
+  const mp_max = toInt(_.get(stat, '主角.资源.最大魔力', _.get(stat, '主角.资源.魔力上限', mp)), mp);
   const action_point = toInt(_.get(stat, '主角.资源.行动点', 1), 1);
   const move_point = toInt(_.get(stat, '主角.资源.移动点', 1), 1);
   const slot_now = toInt(_.get(stat, '主角.资源.灵装槽当前', 0), 0);
@@ -2049,11 +2128,13 @@ function buildMvuSummaryPrompt(chat_data: any): string {
     lines.push(`战场日志: ${recent_logs.map(([k, v]) => `${k}:${v}`).join('；')}`);
   }
 
-  lines.push('要求: 以上状态为本轮叙事硬约束。必须据此输出，不得与状态冲突。');
+  lines.push('要求: 优先遵循以上状态叙事，不得与状态冲突。');
+  lines.push('判定原则: 玩家先描述行动；若行动不可能/有代价/有风险，先明确告知。仅当玩家明确“要规避风险”时再掷骰。');
   lines.push('角色触发规范: 优先按自然叙事输出即可（系统会从中文正文自动识别在场角色）；若你愿意，也可在末尾附加 <OnStageCharacters>JSON数组提高稳定性。');
   lines.push('内心想法规范: 本轮若出现在场角色，必须给出其“本回合内心想法/心理动机”，并随回合刷新，不得长期复用旧句。');
   lines.push('地点硬限制: 角色“薇薇安娜·威曼普”仅允许在“威曼普城西侧·大图书馆”及其内部场景出现；若地点不在大图书馆，禁止让其出场或发言。');
   lines.push('人物弧光规范: 薇薇安娜的态度需随好感阶段自然变化；若阶段=伴侣，必须表现为“成熟克制的并肩关系”，禁止依恋化、幼态化或占有欲表达。');
+  lines.push('文风要求: 使用自然叙事，不要机械复述变量清单，不要把系统规则原样复读进正文。');
   lines.push('JSON字段: 姓名(string), 好感度(-200~1000), 态度(string), 内心想法(string), 基础属性(object<number>)。');
   lines.push('可选附加: <NpcRelationHints>JSON数组</NpcRelationHints>，字段: 姓名(string), 标签(string[])。');
   return lines.join('\n');
@@ -2242,13 +2323,12 @@ $(() => {
         const old_data = Mvu.getMvuData({ type: 'message', message_id });
         const new_data = await Mvu.parseMessage(content, old_data);
 
-        // 禁止口胡：没有显式变量更新块时，不允许改动核心 MVU 数据
-        if (!hasExplicitUpdateTag(content)) {
-          new_data.stat_data = _.isObjectLike(old_data?.stat_data) ? _.cloneDeep(old_data.stat_data) : {};
-        }
-
         if (!new_data.stat_data || typeof new_data.stat_data !== 'object') {
           new_data.stat_data = {};
+        }
+        // 无显式更新块时，锁关键数值字段，允许自然叙事驱动的非关键字段同步
+        if (!hasExplicitUpdateTag(content)) {
+          lockCriticalStateWithoutTag(new_data.stat_data, old_data?.stat_data);
         }
         ensureAirCombatData(new_data.stat_data);
         ensureNpcData(new_data.stat_data);
@@ -2440,5 +2520,19 @@ $(() => {
     if (latest && latest.role === 'assistant') {
       void syncMessageToMvu(latest.message_id);
     }
+
+    // 兜底轮询：某些模型/预设下事件触发不稳定，定时检查最新assistant楼层
+    const fallback_poll_timer = window.setInterval(() => {
+      const latest_message = getChatMessages(-1, { include_swipes: false })[0];
+      if (!latest_message || latest_message.role !== 'assistant' || latest_message.is_hidden) return;
+      void syncMessageToMvu(latest_message.message_id);
+    }, 1500);
+    window.addEventListener(
+      'beforeunload',
+      () => {
+        window.clearInterval(fallback_poll_timer);
+      },
+      { once: true },
+    );
   })();
 });

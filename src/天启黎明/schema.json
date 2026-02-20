@@ -42,7 +42,18 @@
               "default": 21,
               "type": "number"
             },
+            "性别": {
+              "default": "男性",
+              "type": "string",
+              "enum": [
+                "男性",
+                "女性"
+              ]
+            },
             "作弊模式": {
+              "type": "boolean"
+            },
+            "剧情模式": {
               "type": "boolean"
             }
           }
@@ -180,6 +191,51 @@
           "additionalProperties": {
             "type": "string",
             "description": "事务描述"
+          }
+        },
+        "新手引导": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "剧情模式": {
+              "type": "boolean"
+            },
+            "训练判定": {
+              "default": "未受训",
+              "type": "string",
+              "enum": [
+                "未受训",
+                "已受训"
+              ]
+            },
+            "阶段": {
+              "default": "入学手续",
+              "type": "string",
+              "enum": [
+                "入学手续",
+                "课程周",
+                "希尔顿试验室任务",
+                "自由推进"
+              ]
+            },
+            "入学手续进度": {
+              "type": "number"
+            },
+            "课程周进度": {
+              "type": "number"
+            },
+            "已完成入学手续": {
+              "type": "boolean"
+            },
+            "已完成课程周": {
+              "type": "boolean"
+            },
+            "已接希尔顿任务": {
+              "type": "boolean"
+            },
+            "最后推进说明": {
+              "type": "string"
+            }
           }
         },
         "长期NPC列表": {

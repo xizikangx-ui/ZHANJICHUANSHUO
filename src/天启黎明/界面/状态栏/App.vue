@@ -4,7 +4,12 @@
       <section v-if="create_stage === 'cover'" class="cover-panel">
         <h1 class="logo">天启黎明</h1>
         <p class="author">作者：未来</p>
-        <button type="button" class="start-btn large" @click="create_stage = 'profile'">开始游戏</button>
+        <div class="cover-actions">
+          <button type="button" class="start-btn large" @click="create_stage = 'profile'">开始游戏</button>
+          <button type="button" class="plot-btn large" :class="{ active: plot_mode }" @click="plot_mode = !plot_mode">
+            {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
+          </button>
+        </div>
         <button type="button" class="cheat-btn" :class="{ active: cheat_mode }" @click="cheat_mode = !cheat_mode">
           {{ cheat_mode ? '作弊模式：开启' : '作弊模式：关闭' }}
         </button>
@@ -226,22 +231,23 @@
     </section>
 
     <template v-else>
-      <section v-if="display_floor_text" class="mvu-textbox">
-        <h2>MVU正文</h2>
-        <pre class="mvu-body">{{ display_floor_text }}</pre>
-      </section>
-      <section class="next-actions">
-        <h2>接下来可进行（随最新AI回复更新）</h2>
-        <div class="next-actions-grid">
-          <button
-            v-for="action in next_action_options"
-            :key="action"
-            type="button"
-            class="next-action-btn"
-            @click="send_next_action(action)"
-          >
-            {{ action }}
-          </button>
+      <section class="mvu-textbox">
+        <h2>MVU正文与可选行动</h2>
+        <pre v-if="display_floor_text" class="mvu-body">{{ display_floor_text }}</pre>
+        <p v-else class="empty-tip">当前暂无可展示正文</p>
+        <div class="next-actions">
+          <h3>接下来可进行（自动生成，可点击）</h3>
+          <div class="next-actions-grid">
+            <button
+              v-for="action in next_action_options"
+              :key="action"
+              type="button"
+              class="next-action-btn"
+              @click="send_next_action(action)"
+            >
+              {{ action }}
+            </button>
+          </div>
         </div>
       </section>
       <section v-if="data.界面.游戏结束.已结束" class="gameover-banner">
@@ -548,6 +554,8 @@ const show_create = computed(() => !data.value.界面.建卡.已开始);
 const create_stage = ref<CreateStage>('cover');
 const create_error = ref('');
 const cheat_mode = ref(false);
+const plot_mode = ref(false);
+const draft_initialized = ref(false);
 
 const warmaid_types: WarmaidType[] = ['侦察型', '轻型', '中型', '重型', '要塞型', '地面支援姬'];
 const human_keys: HumanKey[] = ['力量', '敏捷', '体质', '感知', '意志', '魅力', '学识'];
@@ -611,6 +619,7 @@ const skill_points_total = 4;
 const authority_paths: AuthorityPath[] = ['生命', '历史', '群星', '黎明', '黑夜', '力量', '希望', '勇气', '梦想'];
 const authority_forbidden_pattern = /无敌|神|成神|全能|直接成为权柄之主|权柄之主|永生|秒杀|无限|必胜|无上限/i;
 const background_filter_pattern = /武器|装备|能力|技能|灵装|道具|神器|无敌|神格|权柄之主/i;
+const training_keyword_pattern = /军人|军队|部队|训练|受训|战术|服役|教官|军校|实战/;
 const warmaid_skill_tree: Record<WarmaidType, SkillNode[]> = {
   侦察型: [
     { id: '1', name: '侦察升级', cost: 1, desc: '侦察骰点提升1D6，侦察大成功范围增加。', prerequisites: [] },
@@ -903,17 +912,29 @@ watch(
   },
 );
 
-watchEffect(() => {
-  const saved = data.value.界面.建卡;
-  if (!saved || saved.已开始) return;
+watch(
+  () => show_create.value,
+  show => {
+    if (!show) {
+      draft_initialized.value = false;
+      return;
+    }
+    if (draft_initialized.value) return;
 
-  create_form.角色姓名 = saved.角色姓名 || '';
-  create_form.职业 = saved.职业;
-  create_form.战姬类型 = saved.战姬类型;
-  create_form.性别 = (saved as any).性别 === '女性' ? '女性' : create_form.职业 === '战姬' ? '女性' : '男性';
-  create_form.年龄 = saved.年龄;
-  cheat_mode.value = Boolean(saved.作弊模式);
-});
+    const saved = data.value.界面.建卡;
+    if (!saved || saved.已开始) return;
+
+    create_form.角色姓名 = saved.角色姓名 || '';
+    create_form.职业 = saved.职业;
+    create_form.战姬类型 = saved.战姬类型;
+    create_form.性别 = (saved as any).性别 === '女性' ? '女性' : create_form.职业 === '战姬' ? '女性' : '男性';
+    create_form.年龄 = saved.年龄;
+    cheat_mode.value = Boolean(saved.作弊模式);
+    plot_mode.value = Boolean((saved as any).剧情模式);
+    draft_initialized.value = true;
+  },
+  { immediate: true },
+);
 
 watchEffect(() => {
   if (show_create.value) return;
@@ -983,14 +1004,16 @@ function ensure_four_actions(list: string[]): string[] {
 watch(
   () => display_floor_text.value,
   (val) => {
-    next_action_options.value = ensure_four_actions(build_next_actions_from_reply(String(val ?? '')));
+    const source = String(val ?? '').trim() || String(data.value.界面?.楼层文本?.原文 ?? '');
+    next_action_options.value = ensure_four_actions(build_next_actions_from_reply(source));
   },
   { immediate: true },
 );
 watch(
   () => Number((data.value as any).界面?.楼层文本?.更新时间 ?? 0),
   () => {
-    next_action_options.value = ensure_four_actions(build_next_actions_from_reply(display_floor_text.value));
+    const source = String(display_floor_text.value ?? '').trim() || String(data.value.界面?.楼层文本?.原文 ?? '');
+    next_action_options.value = ensure_four_actions(build_next_actions_from_reply(source));
   },
 );
 
@@ -1322,6 +1345,8 @@ function finish_create(): void {
   }
   const bg_raw = background_input.value.trim();
   const bg_summary = background_summary_override.value.trim() || sanitizeBackground(bg_raw);
+  const training_source = `${bg_raw}\n${bg_summary}`;
+  const training_state = training_keyword_pattern.test(training_source) ? '已受训' : '未受训';
 
   data.value.界面.建卡 = {
     已开始: true,
@@ -1331,6 +1356,7 @@ function finish_create(): void {
     性别: create_form.职业 === '战姬' ? '女性' : create_form.性别,
     年龄: Number(create_form.年龄),
     作弊模式: cheat_mode.value,
+    剧情模式: plot_mode.value,
   };
 
   data.value.主角.档案.代号 = name;
@@ -1397,11 +1423,28 @@ function finish_create(): void {
   data.value.世界.当前时间 = '联合纪年177年8月28日 08:00';
   data.value.世界.当前地点 = '卡尔斯战姬学院 主校区 报到大厅';
   data.value.世界.战区威胁等级 = '低';
+  data.value.世界.新手引导 = {
+    剧情模式: plot_mode.value,
+    训练判定: training_state,
+    阶段: plot_mode.value ? '入学手续' : '自由推进',
+    入学手续进度: 0,
+    课程周进度: 0,
+    已完成入学手续: false,
+    已完成课程周: false,
+    已接希尔顿任务: false,
+    最后推进说明: plot_mode.value
+      ? '剧情模式已开启：请先完成入学手续，再完成一周课程，最后前往最低难度希尔顿试验室。'
+      : '剧情模式未开启：可自由推进。',
+  };
   data.value.世界.近期事务 = {
     新生报道: '在威曼普学院完成身份登记与宿舍分配',
     北线战况: '咒妄率异种突破北部防线，光明大圣堂遭围困',
     小队任务: '新生侦察小队即将承接前沿侦查任务',
     背景摘要: bg_summary || '暂无背景摘要',
+    训练判定: training_state === '已受训' ? '背景含训练/战术经历，按受训生处理。' : '背景未出现军人/训练/战术经历，按未受训新生处理。',
+    引导链: plot_mode.value
+      ? '阶段1/3 入学手续：身份核验→链路适配→纪律简报。'
+      : '剧情模式关闭：不强制入学引导链。',
   };
 
   data.value.战场日志 = {
@@ -1504,9 +1547,32 @@ function toggle_transform(): void {
   }
 }
 
-function send_next_action(action: string): void {
+async function send_next_action(action: string): Promise<void> {
   const ok = window.confirm(`确定吗？\n将发送：${action}`);
   if (!ok) return;
+
+  // 首选酒馆助手官方接口，避免跨域/DOM结构差异导致发送失败。
+  try {
+    if (typeof createChatMessages === 'function') {
+      await createChatMessages([{ role: 'user', message: action }]);
+      if (typeof triggerSlash === 'function') triggerSlash('/trigger');
+      return;
+    }
+  } catch (error) {
+    console.warn('[天启黎明] createChatMessages 发送失败，回退到兼容模式。', error);
+  }
+
+  // 远程前端在跨域 iframe 中时，不能直接操作父页面 DOM，优先通过 postMessage 交给主页面脚本代发。
+  try {
+    const payload = {
+      type: 'apocalypse-dawn:send_action',
+      source: 'apocalypse_dawn_mvu',
+      action,
+      ts: Date.now(),
+    };
+    if (window.parent) window.parent.postMessage(payload, '*');
+    if (window.top && window.top !== window.parent) window.top.postMessage(payload, '*');
+  } catch {}
 
   const docs: Document[] = [];
   docs.push(window.document);
@@ -1543,8 +1609,8 @@ function send_next_action(action: string): void {
       }
     }
   }
-
-  alert('未找到酒馆输入框或发送按钮，请手动发送。');
+  // 这里不再弹错误：跨域模式下主页面会通过 message 监听代发，避免误报。
+  console.info('[天启黎明] 当前上下文未直接找到输入框，已尝试通过 postMessage 发送。');
 }
 </script>
 
@@ -1595,6 +1661,12 @@ function send_next_action(action: string): void {
 .author {
   font-size: 18px;
   color: #5f4332;
+}
+.cover-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 .create-panel {
   display: grid;
@@ -1672,6 +1744,23 @@ function send_next_action(action: string): void {
 .start-btn.large {
   font-size: 16px;
   padding: 10px 28px;
+}
+.plot-btn {
+  border: 1px solid #395f78;
+  background: #eef7ff;
+  color: #1d4258;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.plot-btn.active {
+  background: #1d4d68;
+  color: #fff;
+}
+.plot-btn.large {
+  font-size: 16px;
+  padding: 10px 20px;
 }
 .cheat-btn {
   border: 1px solid #b03333;

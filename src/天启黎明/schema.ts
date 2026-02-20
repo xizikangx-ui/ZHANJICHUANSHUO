@@ -11,7 +11,9 @@
               .enum(['侦察型', '轻型', '中型', '重型', '要塞型', '地面支援姬'])
               .prefault('轻型'),
             年龄: z.coerce.number().transform(v => _.clamp(v, 12, 80)).prefault(21),
+            性别: z.enum(['男性', '女性']).prefault('男性'),
             作弊模式: z.boolean().prefault(false),
+            剧情模式: z.boolean().prefault(false),
           })
           .prefault({}),
         楼层文本: z
@@ -65,6 +67,19 @@
         天气: z.string().prefault('阴，低能见度'),
         战区威胁等级: z.enum(['低', '中', '高', '极危']).prefault('中'),
         近期事务: z.record(z.string().describe('事务名'), z.string().describe('事务描述')).prefault({}),
+        新手引导: z
+          .object({
+            剧情模式: z.boolean().prefault(false),
+            训练判定: z.enum(['未受训', '已受训']).prefault('未受训'),
+            阶段: z.enum(['入学手续', '课程周', '希尔顿试验室任务', '自由推进']).prefault('入学手续'),
+            入学手续进度: z.coerce.number().transform(v => _.clamp(v, 0, 4)).prefault(0),
+            课程周进度: z.coerce.number().transform(v => _.clamp(v, 0, 7)).prefault(0),
+            已完成入学手续: z.boolean().prefault(false),
+            已完成课程周: z.boolean().prefault(false),
+            已接希尔顿任务: z.boolean().prefault(false),
+            最后推进说明: z.string().prefault(''),
+          })
+          .prefault({}),
         长期NPC列表: z.record(
           z.string().describe('NPC姓名'),
           z.object({

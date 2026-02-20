@@ -1792,6 +1792,7 @@ function advanceWorldTimeByAction(stat_data: any, content: string): void {
 
 const player_background_trigger_pattern = /(我的背景|角色背景|人物背景|身世|来历|经历|过去|设定如下|背景如下)/;
 const player_background_strip_pattern = /武器|装备|能力|技能|灵装|道具|神器|无敌|神格|权柄之主/;
+const training_keyword_pattern = /军人|军队|部队|训练|受训|战术|服役|教官|军校|实战/;
 
 function summarizePlayerBackground(raw: string): string {
   const text = String(raw ?? '')
@@ -1828,6 +1829,98 @@ function applyPlayerBackgroundInput(stat_data: any, content: string): boolean {
   _.set(stat_data, '主角.背景.摘要', summary);
   _.set(stat_data, '世界.近期事务.背景更新', `玩家补充背景：${summary}`);
   return true;
+}
+
+function detectTrainingStateFromBackground(stat_data: any): '未受训' | '已受训' {
+  const raw = String(_.get(stat_data, '主角.背景.原文', ''));
+  const summary = String(_.get(stat_data, '主角.背景.摘要', ''));
+  return training_keyword_pattern.test(`${raw}\n${summary}`) ? '已受训' : '未受训';
+}
+
+function ensureStoryGuideState(stat_data: any): void {
+  if (!_.isObjectLike(_.get(stat_data, '世界'))) _.set(stat_data, '世界', {});
+  if (!_.isObjectLike(_.get(stat_data, '世界.近期事务'))) _.set(stat_data, '世界.近期事务', {});
+  if (!_.isObjectLike(_.get(stat_data, '世界.新手引导'))) {
+    _.set(stat_data, '世界.新手引导', {
+      剧情模式: false,
+      训练判定: '未受训',
+      阶段: '入学手续',
+      入学手续进度: 0,
+      课程周进度: 0,
+      已完成入学手续: false,
+      已完成课程周: false,
+      已接希尔顿任务: false,
+      最后推进说明: '',
+    });
+  } else {
+    _.defaultsDeep(_.get(stat_data, '世界.新手引导'), {
+      剧情模式: false,
+      训练判定: '未受训',
+      阶段: '入学手续',
+      入学手续进度: 0,
+      课程周进度: 0,
+      已完成入学手续: false,
+      已完成课程周: false,
+      已接希尔顿任务: false,
+      最后推进说明: '',
+    });
+  }
+
+  const mode_by_card = Boolean(_.get(stat_data, '界面.建卡.剧情模式', false));
+  _.set(stat_data, '世界.新手引导.剧情模式', mode_by_card || Boolean(_.get(stat_data, '世界.新手引导.剧情模式', false)));
+  _.set(stat_data, '世界.新手引导.训练判定', detectTrainingStateFromBackground(stat_data));
+}
+
+const admission_keyword_pattern = /报到|登记|核验|适配|测试|纪律简报|入学手续|宿舍/;
+const course_keyword_pattern = /课程|训练|课堂|演练|体能|战术课|模拟战|读书|学习/;
+const hilton_keyword_pattern = /希尔顿|试验室|实验室|探索|侦查任务|副本|出发/;
+
+function progressStoryGuideByContent(stat_data: any, content: string): void {
+  ensureStoryGuideState(stat_data);
+  const guide = _.get(stat_data, '世界.新手引导');
+  if (!guide || !guide.剧情模式) return;
+
+  const text = String(content ?? '');
+  if (!text.trim()) return;
+  const stage = String(guide.阶段 || '入学手续');
+
+  if (stage === '入学手续') {
+    if (!admission_keyword_pattern.test(text)) return;
+    guide.入学手续进度 = _.clamp(asNumber(guide.入学手续进度, 0) + 1, 0, 4);
+    guide.最后推进说明 = `入学手续推进 ${guide.入学手续进度}/4`;
+    _.set(stat_data, '世界.近期事务.引导链', `阶段1/3 入学手续（${guide.入学手续进度}/4）`);
+    if (guide.入学手续进度 >= 4) {
+      guide.已完成入学手续 = true;
+      guide.阶段 = '课程周';
+      guide.最后推进说明 = '入学手续已完成，进入一周课程。';
+      _.set(stat_data, '世界.近期事务.引导链', '阶段2/3 课程周（0/7）');
+      _.set(stat_data, '世界.近期事务.课程安排', '进行一周基础课程：体能、战术理论、模拟侦察与安全条例。');
+    }
+    return;
+  }
+
+  if (stage === '课程周') {
+    if (!course_keyword_pattern.test(text)) return;
+    guide.课程周进度 = _.clamp(asNumber(guide.课程周进度, 0) + 1, 0, 7);
+    guide.最后推进说明 = `课程周推进 ${guide.课程周进度}/7`;
+    _.set(stat_data, '世界.近期事务.引导链', `阶段2/3 课程周（${guide.课程周进度}/7）`);
+    if (guide.课程周进度 >= 7) {
+      guide.已完成课程周 = true;
+      guide.阶段 = '希尔顿试验室任务';
+      guide.最后推进说明 = '课程周已完成，可接取最低难度希尔顿试验室探索任务。';
+      _.set(stat_data, '世界.近期事务.引导链', '阶段3/3 希尔顿试验室任务（待接取）');
+      _.set(stat_data, '世界.近期事务.实验室任务', '前往最低难度希尔顿试验室，完成首次探索与撤离。');
+    }
+    return;
+  }
+
+  if (stage === '希尔顿试验室任务') {
+    if (!hilton_keyword_pattern.test(text)) return;
+    guide.已接希尔顿任务 = true;
+    guide.阶段 = '自由推进';
+    guide.最后推进说明 = '已接取并开始最低难度希尔顿试验室探索任务。';
+    _.set(stat_data, '世界.近期事务.引导链', '引导链完成：已进入自由推进阶段。');
+  }
 }
 
 function buildOutcomePrompt(outcome: SkillOutcome, game_over: boolean): string {
@@ -1903,6 +1996,12 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   const skill_attr = toShortText(_.get(stat, '主角.技能检定.关联属性', '无'));
   const skill_total = toInt(_.get(stat, '主角.技能检定.总值', 0), 0);
   const bg_summary = toShortText(_.get(stat, '主角.背景.摘要', ''), '');
+  const plot_mode = Boolean(_.get(stat, '世界.新手引导.剧情模式', _.get(stat, '界面.建卡.剧情模式', false)));
+  const training_state = toShortText(_.get(stat, '世界.新手引导.训练判定', '未受训'));
+  const guide_stage = toShortText(_.get(stat, '世界.新手引导.阶段', '入学手续'));
+  const admission_progress = toInt(_.get(stat, '世界.新手引导.入学手续进度', 0), 0);
+  const course_progress = toInt(_.get(stat, '世界.新手引导.课程周进度', 0), 0);
+  const guide_note = toShortText(_.get(stat, '世界.新手引导.最后推进说明', ''), '');
 
   const recent_affairs = pickTailEntries(_.get(stat, '世界.近期事务', {}), 2);
   const recent_logs = pickTailEntries(_.get(stat, '战场日志', {}), 2);
@@ -1918,6 +2017,21 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   ];
   if (bg_summary) {
     lines.push(`主角背景摘要: ${bg_summary}`);
+  }
+  if (plot_mode) {
+    lines.push(`剧情模式: 开启 | 训练判定=${training_state} | 当前阶段=${guide_stage}`);
+    lines.push(`引导进度: 入学手续=${admission_progress}/4 | 课程周=${course_progress}/7`);
+    if (guide_note) lines.push(`引导备注: ${guide_note}`);
+    lines.push('剧情模式硬约束: 必须严格按阶段推进，不得越级。');
+    if (guide_stage === '入学手续') {
+      lines.push('当前只允许输出入学手续相关内容：身份核验、报到登记、链路适配测试、纪律简报。禁止提前进入课程周或希尔顿试验室任务。');
+    } else if (guide_stage === '课程周') {
+      lines.push('当前只允许输出课程周内容：体能/战术理论/模拟侦察等日程训练。禁止提前进入希尔顿试验室探索。');
+    } else if (guide_stage === '希尔顿试验室任务') {
+      lines.push('当前必须引导至“最低难度希尔顿试验室探索任务”，并围绕接任务、整备、出发推进。');
+    }
+  } else {
+    lines.push('剧情模式: 关闭（可自由推进）。');
   }
 
   if (recent_affairs.length > 0) {
@@ -1937,6 +2051,47 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   return lines.join('\n');
 }
 
+function trySendActionToChatInput(action: string): boolean {
+  const text = String(action ?? '').trim();
+  if (!text) return false;
+
+  const textarea_selectors = [
+    '#send_textarea',
+    'textarea#send_textarea',
+    'textarea[id*="send"]',
+    'textarea',
+  ];
+  const send_btn_selectors = [
+    '#send_but',
+    'button#send_but',
+    '#send-button',
+    'button[type="submit"]',
+  ];
+
+  let input_el: HTMLTextAreaElement | null = null;
+  for (const sel of textarea_selectors) {
+    const el = document.querySelector(sel);
+    if (el instanceof HTMLTextAreaElement) {
+      input_el = el;
+      break;
+    }
+  }
+  if (!input_el) return false;
+
+  input_el.value = text;
+  input_el.dispatchEvent(new Event('input', { bubbles: true }));
+  input_el.dispatchEvent(new Event('change', { bubbles: true }));
+
+  for (const sel of send_btn_selectors) {
+    const btn = document.querySelector(sel);
+    if (btn instanceof HTMLElement) {
+      btn.click();
+      return true;
+    }
+  }
+  return false;
+}
+
 $(() => {
   errorCatched(async () => {
     const global_key = '__apocalypse_dawn_variable_bridge_installed__';
@@ -1951,6 +2106,20 @@ $(() => {
     const synced_message_content = new Map<number, string>();
       const pending_skill_by_user_message = new Map<number, PendingSkillState>();
     const processed_user_messages = new Set<number>();
+
+    // 允许跨域 iframe 前端通过 postMessage 请求主页面代发消息。
+    window.addEventListener('message', evt => {
+      const payload = evt.data;
+      if (!_.isObjectLike(payload)) return;
+      if ((payload as any).type !== 'apocalypse-dawn:send_action') return;
+      if ((payload as any).source !== 'apocalypse_dawn_mvu') return;
+      const action = String((payload as any).action ?? '').trim();
+      if (!action) return;
+      const sent = trySendActionToChatInput(action);
+      if (!sent) {
+        console.warn('[天启黎明][动作发送] 未找到输入框或发送按钮，无法代发。');
+      }
+    });
 
     async function processUserAction(message_id: number): Promise<void> {
       if (processed_user_messages.has(message_id)) return;
@@ -1972,8 +2141,11 @@ $(() => {
       next_data.stat_data = _.isObjectLike(next_data?.stat_data) ? _.cloneDeep(next_data.stat_data) : {};
       ensureAirCombatData(next_data.stat_data);
       ensureNpcData(next_data.stat_data);
+      ensureStoryGuideState(next_data.stat_data);
       resetNpcStateBeforeCreate(next_data.stat_data);
       applyPlayerBackgroundInput(next_data.stat_data, source_content);
+      ensureStoryGuideState(next_data.stat_data);
+      progressStoryGuideByContent(next_data.stat_data, source_content);
       advanceWorldTimeByAction(next_data.stat_data, source_content);
       const user_npc_request_hit = applyUserNpcRequest(next_data.stat_data, source_content);
 
@@ -2072,6 +2244,7 @@ $(() => {
         }
         ensureAirCombatData(new_data.stat_data);
         ensureNpcData(new_data.stat_data);
+        ensureStoryGuideState(new_data.stat_data);
         resetNpcStateBeforeCreate(new_data.stat_data);
         if (!new_data.stat_data.界面 || typeof new_data.stat_data.界面 !== 'object') {
           new_data.stat_data.界面 = {};

@@ -2155,9 +2155,12 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   const authority_shard = toInt(_.get(stat, '主角.成长.权柄碎片', 0), 0);
   const has_origin = Boolean(_.get(stat, '主角.成长.权柄本源', false));
 
-  const skill_result = toShortText(_.get(stat, '主角.技能检定.结果', '无'));
-  const skill_attr = toShortText(_.get(stat, '主角.技能检定.关联属性', '无'));
-  const skill_total = toInt(_.get(stat, '主角.技能检定.总值', 0), 0);
+  const skill_desc = toShortText(_.get(stat, '主角.技能检定.结果描述', '暂无检定'));
+  const skill_updated = toInt(_.get(stat, '主角.技能检定.更新时间', 0), 0) > 0;
+  const no_skill_yet = !skill_updated || /暂无检定|尚未检定|未进行检定/.test(skill_desc);
+  const skill_result = no_skill_yet ? '无' : toShortText(_.get(stat, '主角.技能检定.结果', '无'));
+  const skill_attr = no_skill_yet ? '无' : toShortText(_.get(stat, '主角.技能检定.关联属性', '无'));
+  const skill_total = no_skill_yet ? 0 : toInt(_.get(stat, '主角.技能检定.总值', 0), 0);
   const bg_summary = toShortText(_.get(stat, '主角.背景.摘要', ''), '');
   const plot_mode = Boolean(_.get(stat, '世界.新手引导.剧情模式', _.get(stat, '界面.建卡.剧情模式', false)));
   const training_state = toShortText(_.get(stat, '世界.新手引导.训练判定', '未受训'));

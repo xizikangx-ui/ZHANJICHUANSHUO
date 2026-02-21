@@ -288,9 +288,21 @@
       </nav>
       <section v-if="active_tab === 'main'" class="panel">
         <div class="bars">
-          <div class="bar"><label>生命</label><progress :value="data.主角.资源.当前生命" :max="data.主角.资源.最大生命" /></div>
-          <div class="bar"><label>魔力</label><progress :value="data.主角.资源.当前魔力" :max="data.主角.资源.最大魔力" /></div>
-          <div class="bar"><label>污染</label><progress :value="data.主角.资源.污染值" max="100" /></div>
+          <div class="bar">
+            <label>生命</label>
+            <progress :value="data.主角.资源.当前生命" :max="data.主角.资源.最大生命" />
+            <strong class="bar-value">{{ data.主角.资源.当前生命 }}/{{ data.主角.资源.最大生命 }}</strong>
+          </div>
+          <div class="bar">
+            <label>魔力</label>
+            <progress :value="data.主角.资源.当前魔力" :max="data.主角.资源.最大魔力" />
+            <strong class="bar-value">{{ data.主角.资源.当前魔力 }}/{{ data.主角.资源.最大魔力 }}</strong>
+          </div>
+          <div class="bar">
+            <label>污染</label>
+            <progress :value="data.主角.资源.污染值" max="100" />
+            <strong class="bar-value">{{ data.主角.资源.污染值 }}/100</strong>
+          </div>
         </div>
 
         <div class="grid two">
@@ -1488,6 +1500,16 @@ function finish_create(): void {
     学识: 0,
   };
 
+  // 强制重置关键资源，避免旧会话污染导致“开局即死亡”。
+  const max_hp = Math.max(100, Number(human_attr.体质 || 1) * 100);
+  data.value.主角.资源.最大生命 = max_hp;
+  data.value.主角.资源.当前生命 = max_hp;
+  data.value.主角.资源.污染值 = 0;
+  data.value.主角.资源.行动点 = 1;
+  data.value.主角.资源.移动点 = 1;
+  data.value.主角.资源.灵装槽上限 = 10;
+  data.value.主角.资源.灵装槽当前 = 10;
+
   if (create_form.职业 === '战姬') {
     data.value.主角.属性 = { ...warmaid_attr };
     const max_mp = Math.max(20, warmaid_attr.魔力评级 * 10);
@@ -1503,6 +1525,8 @@ function finish_create(): void {
       飞行速度: 0,
       防御评级: 0,
     };
+    data.value.主角.资源.最大魔力 = 100;
+    data.value.主角.资源.当前魔力 = 100;
   }
 
   data.value.主角.灵装化.启用 = false;
@@ -2173,9 +2197,15 @@ async function send_next_action(action: string): Promise<void> {
 }
 .bar {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: 48px 1fr auto;
   align-items: center;
   gap: 8px;
+}
+.bar-value {
+  min-width: 82px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--c-sub);
 }
 progress {
   width: 100%;

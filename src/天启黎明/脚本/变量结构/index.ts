@@ -361,6 +361,30 @@ function extractDisplayText(content: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
+  return stripReasoningLeak(text);
+}
+
+function stripReasoningLeak(input: string): string {
+  let text = String(input ?? '');
+  if (!text) return '';
+
+  // 优先移除常见“思维链/推理”块标记，避免泄露到前端正文。
+  text = text
+    .replace(/<(?:analysis|reasoning|chain[-_ ]?of[-_ ]?thought|cot)[^>]*>[\s\S]*?<\/(?:analysis|reasoning|chain[-_ ]?of[-_ ]?thought|cot)>/gim, '')
+    .replace(/<(?:analysis|reasoning|chain[-_ ]?of[-_ ]?thought|cot)[^>]*\/>/gim, '')
+    .replace(/(?:^|\n)\s*\[(?:思维链|推理过程|内在思考|analysis|reasoning|cot)[^\]]*\][\s\S]*?(?=\n\s*\[|$)/gim, '\n')
+    .replace(/(?:^|\n)\s*<{2,3}\s*(?:思维链|推理|analysis|reasoning|cot)\s*>{2,3}[\s\S]*?(?=\n\s*<{2,3}|\n{2,}|$)/gim, '\n');
+
+  const leakageLinePattern =
+    /^\s*(?:#{1,6}\s*)?(?:思维链|推理过程|内在思考|分析过程|analysis|reasoning|chain[-_ ]?of[-_ ]?thought|cot)\s*[:：]/i;
+  const pseudoToolLinePattern =
+    /^\s*(?:\[?系统思考\]?|thinking\.{0,3}|let me think|internal monologue)\s*[:：]/i;
+
+  const safeLines = text
+    .split('\n')
+    .filter(line => !leakageLinePattern.test(line) && !pseudoToolLinePattern.test(line));
+
+  text = safeLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   return text;
 }
 
@@ -1756,7 +1780,47 @@ function applySkillCheckSystem(stat_data: any, content: string): SkillOutcome | 
   return outcome;
 }
 
+function ensureCoreResourceBaseline(stat_data: any): void {
+  if (!stat_data || typeof stat_data !== 'object') return;
+
+  const build_started = Boolean(_.get(stat_data, '界面.建卡.已开始', false));
+
+  let max_hp = asNumber(_.get(stat_data, '主角.资源.最大生命', 100), 100);
+  if (max_hp < 1) max_hp = 100;
+  let hp = asNumber(_.get(stat_data, '主角.资源.当前生命', max_hp), max_hp);
+  if (!build_started && hp <= 0) hp = max_hp;
+  hp = _.clamp(hp, 0, max_hp);
+  _.set(stat_data, '主角.资源.最大生命', max_hp);
+  _.set(stat_data, '主角.资源.当前生命', hp);
+
+  let max_mp = asNumber(_.get(stat_data, '主角.资源.最大魔力', 100), 100);
+  if (max_mp < 1) max_mp = 100;
+  let mp = asNumber(_.get(stat_data, '主角.资源.当前魔力', max_mp), max_mp);
+  if (!build_started && mp <= 0) mp = max_mp;
+  mp = _.clamp(mp, 0, max_mp);
+  _.set(stat_data, '主角.资源.最大魔力', max_mp);
+  _.set(stat_data, '主角.资源.当前魔力', mp);
+
+  _.set(stat_data, '主角.资源.污染值', _.clamp(asNumber(_.get(stat_data, '主角.资源.污染值', 0), 0), 0, 100));
+  _.set(stat_data, '主角.资源.行动点', _.clamp(asNumber(_.get(stat_data, '主角.资源.行动点', 1), 1), 0, 9));
+  _.set(stat_data, '主角.资源.移动点', _.clamp(asNumber(_.get(stat_data, '主角.资源.移动点', 1), 1), 0, 9));
+
+  const slot_cap = Math.max(1, asNumber(_.get(stat_data, '主角.资源.灵装槽上限', 10), 10));
+  const slot_now = _.clamp(asNumber(_.get(stat_data, '主角.资源.灵装槽当前', slot_cap), slot_cap), 0, slot_cap);
+  _.set(stat_data, '主角.资源.灵装槽上限', slot_cap);
+  _.set(stat_data, '主角.资源.灵装槽当前', slot_now);
+
+  if (!build_started) {
+    _.set(stat_data, '界面.游戏结束.已结束', false);
+    _.set(stat_data, '界面.游戏结束.原因', '');
+    _.set(stat_data, '界面.游戏结束.时间戳', 0);
+  }
+}
+
 function enforceGameOver(stat_data: any, reason: string): boolean {
+  const build_started = Boolean(_.get(stat_data, '界面.建卡.已开始', false));
+  if (!build_started) return false;
+
   const hp = asNumber(_.get(stat_data, '主角.资源.当前生命', 0), 0);
   if (hp > 0) return false;
 
@@ -1775,6 +1839,12 @@ function enforceGameOver(stat_data: any, reason: string): boolean {
 }
 
 function normalizeGameOverState(stat_data: any): void {
+  if (!Boolean(_.get(stat_data, '界面.建卡.已开始', false))) {
+    _.set(stat_data, '界面.游戏结束.已结束', false);
+    _.set(stat_data, '界面.游戏结束.原因', '');
+    _.set(stat_data, '界面.游戏结束.时间戳', 0);
+    return;
+  }
   const hp = asNumber(_.get(stat_data, '主角.资源.当前生命', 0), 0);
   if (hp <= 0) return;
   if (!Boolean(_.get(stat_data, '界面.游戏结束.已结束', false))) return;
@@ -2272,6 +2342,7 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   lines.push('地点硬限制: 角色“薇薇安娜·威曼普”仅允许在“威曼普城西侧·大图书馆”及其内部场景出现；若地点不在大图书馆，禁止让其出场或发言。');
   lines.push('人物弧光规范: 薇薇安娜的态度需随好感阶段自然变化；若阶段=伴侣，必须表现为“成熟克制的并肩关系”，禁止依恋化、幼态化或占有欲表达。');
   lines.push('文风要求: 使用自然叙事，不要机械复述变量清单，不要把系统规则原样复读进正文。');
+  lines.push('安全要求: 严禁输出任何思维链/推理过程/analysis/reasoning/cot 内容；只输出面向玩家可见叙事。');
   lines.push('JSON字段: 姓名(string), 好感度(-200~1000), 态度(string), 内心想法(string), 基础属性(object<number>)。');
   lines.push('可选附加: <NpcRelationHints>JSON数组</NpcRelationHints>，字段: 姓名(string), 标签(string[])。');
   return lines.join('\n');
@@ -2369,6 +2440,7 @@ $(() => {
       ensureAirCombatData(next_data.stat_data);
       ensureNpcData(next_data.stat_data);
       ensureStoryGuideState(next_data.stat_data);
+      ensureCoreResourceBaseline(next_data.stat_data);
       resetNpcStateBeforeCreate(next_data.stat_data);
       enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
       normalizeGameOverState(next_data.stat_data);
@@ -2477,6 +2549,28 @@ $(() => {
       );
     }
 
+    let last_summary_injected_at = 0;
+    function injectMvuSummaryForLatestContext(reason: string): void {
+      const now = Date.now();
+      if (now - last_summary_injected_at < 350) return;
+      last_summary_injected_at = now;
+      const latest_user = getChatMessages(-1, { role: 'user', include_swipes: false })[0];
+      const marker = latest_user?.message_id ?? getLastMessageId();
+      const chat_data = Mvu.getMvuData({ type: 'chat' });
+      const mvu_summary_prompt = buildMvuSummaryPrompt(chat_data);
+      injectPrompts(
+        [{
+          id: `apocalypse-dawn-mvu-summary-${reason}-${marker}-${now}`,
+          position: 'in_chat',
+          depth: 0,
+          role: 'system',
+          content: mvu_summary_prompt,
+          should_scan: true,
+        }],
+        { once: true },
+      );
+    }
+
     async function syncMessageToMvu(message_id: number): Promise<void> {
       if (syncing_message_ids.has(message_id)) return;
 
@@ -2502,6 +2596,7 @@ $(() => {
         ensureAirCombatData(new_data.stat_data);
         ensureNpcData(new_data.stat_data);
         ensureStoryGuideState(new_data.stat_data);
+        ensureCoreResourceBaseline(new_data.stat_data);
         resetNpcStateBeforeCreate(new_data.stat_data);
         const chat_snapshot = Mvu.getMvuData({ type: 'chat' });
         enforcePlayerIdentity(new_data.stat_data, _.get(chat_snapshot, 'stat_data'), _.get(old_data, 'stat_data'));
@@ -2653,7 +2748,8 @@ $(() => {
       }
       const ended = Boolean(_.get(chat_data, 'stat_data.界面.游戏结束.已结束', false));
       const hp_now = asNumber(_.get(chat_data, 'stat_data.主角.资源.当前生命', 1), 1);
-      if (ended && hp_now <= 0) {
+      const build_started = Boolean(_.get(chat_data, 'stat_data.界面.建卡.已开始', false));
+      if (build_started && ended && hp_now <= 0) {
         injectPrompts(
           [{
             id: `apocalypse-dawn-gameover-${Date.now()}`,
@@ -2668,10 +2764,34 @@ $(() => {
       }
     });
 
+    // 预设/模型切换或直接重试生成时，提前再注入一次，避免“切预设后不读变量”。
+    eventOn(tavern_events.GENERATION_STARTED, () => {
+      injectMvuSummaryForLatestContext('generation-started');
+    });
+    eventOn(tavern_events.PRESET_CHANGED, () => {
+      injectMvuSummaryForLatestContext('preset-changed');
+    });
+    eventOn(tavern_events.OAI_PRESET_CHANGED_AFTER, () => {
+      injectMvuSummaryForLatestContext('oai-preset-after');
+    });
+    eventOn(tavern_events.CHATCOMPLETION_MODEL_CHANGED, () => {
+      injectMvuSummaryForLatestContext('model-changed');
+    });
+    eventOn(tavern_events.CHATCOMPLETION_SOURCE_CHANGED, () => {
+      injectMvuSummaryForLatestContext('source-changed');
+    });
+    eventOn(tavern_events.MAIN_API_CHANGED, () => {
+      injectMvuSummaryForLatestContext('main-api-changed');
+    });
+    eventOn(tavern_events.SETTINGS_UPDATED, () => {
+      injectMvuSummaryForLatestContext('settings-updated');
+    });
+
     eventOn(tavern_events.CHAT_CHANGED, () => {
       syncing_message_ids.clear();
       synced_message_content.clear();
       pending_skill_by_user_message.clear();
+      injectMvuSummaryForLatestContext('chat-changed');
 
       const latest = getChatMessages(-1, { include_swipes: false })[0];
       if (latest && latest.role === 'assistant') {

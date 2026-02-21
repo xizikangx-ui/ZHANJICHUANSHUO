@@ -6,7 +6,7 @@
         <p class="author">作者：未来</p>
         <div class="cover-actions">
           <button type="button" class="start-btn large" @click="create_stage = 'profile'">开始游戏</button>
-          <button type="button" class="plot-btn large" :class="{ active: plot_mode }" @click="plot_mode = !plot_mode">
+          <button type="button" class="plot-btn large" :class="{ active: plot_mode }" @click="toggle_plot_mode">
             {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
           </button>
         </div>
@@ -232,7 +232,12 @@
 
     <template v-else>
       <section class="mvu-textbox">
-        <h2>MVU正文与可选行动</h2>
+        <div class="mvu-toolbar">
+          <h2>MVU正文与可选行动</h2>
+          <button type="button" class="plot-btn" :class="{ active: plot_mode }" @click="toggle_plot_mode">
+            {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
+          </button>
+        </div>
         <pre v-if="display_floor_text" class="mvu-body">{{ display_floor_text }}</pre>
         <p v-else class="empty-tip">当前暂无可展示正文</p>
         <div class="next-actions">
@@ -885,6 +890,21 @@ function toggle_module(module_name: '在场角色' | '长期NPC'): void {
     ...module_fold_state.value,
     [module_name]: !current,
   };
+}
+
+function toggle_plot_mode(): void {
+  plot_mode.value = !plot_mode.value;
+  data.value.界面.建卡.剧情模式 = plot_mode.value;
+  if (!data.value.世界.新手引导) return;
+  data.value.世界.新手引导.剧情模式 = plot_mode.value;
+  if (!plot_mode.value) {
+    data.value.世界.新手引导.阶段 = '自由推进';
+    data.value.世界.新手引导.最后推进说明 = '剧情模式关闭：不强制入学引导链。';
+  } else if (data.value.世界.新手引导.阶段 === '自由推进') {
+    data.value.世界.新手引导.阶段 = '入学手续';
+    data.value.世界.新手引导.最后推进说明 =
+      '剧情模式已开启：请先完成入学手续，再完成一周课程，最后前往最低难度希尔顿试验室。';
+  }
 }
 
 watch(
@@ -1900,6 +1920,13 @@ async function send_next_action(action: string): Promise<void> {
   padding: 12px;
   border-bottom: 1px dashed #7d8a90;
   background: #fffef8;
+}
+.mvu-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 .next-actions {
   padding: 12px;

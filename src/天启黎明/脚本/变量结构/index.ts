@@ -1277,8 +1277,14 @@ function lockCriticalStateWithoutTag(new_stat: any, old_stat: any): void {
   if (!_.isObjectLike(new_stat)) return;
   if (!_.isObjectLike(old_stat)) return;
   const critical_paths = [
+    '界面.建卡',
+    '主角.档案',
+    '主角.人类属性',
+    '主角.属性',
     '主角.资源',
     '主角.成长',
+    '主角.战术',
+    '主角.技能检定',
     '主角.装备',
     '主角.异常状态',
     '战利品.仓库',
@@ -2036,6 +2042,76 @@ function toInt(value: unknown, fallback = 0): number {
   return Math.trunc(asNumber(value, fallback));
 }
 
+function normalizeProfession(raw: unknown, path_raw: unknown): '指挥官' | '战姬' | '权柄使役者' {
+  const profession = String(raw ?? '').trim();
+  if (profession === '指挥官' || profession === '战姬' || profession === '权柄使役者') return profession;
+  const path = String(path_raw ?? '').trim();
+  if (path.includes('战姬')) return '战姬';
+  if (path.includes('权柄')) return '权柄使役者';
+  return '指挥官';
+}
+
+function pickNonEmpty(...values: unknown[]): string {
+  for (const v of values) {
+    const s = String(v ?? '').trim();
+    if (s) return s;
+  }
+  return '';
+}
+
+function enforcePlayerIdentity(stat_data: any, fallback_stat?: any): void {
+  if (!_.isObjectLike(stat_data)) return;
+  if (!_.isObjectLike(_.get(stat_data, '界面'))) _.set(stat_data, '界面', {});
+  if (!_.isObjectLike(_.get(stat_data, '界面.建卡'))) _.set(stat_data, '界面.建卡', {});
+  if (!_.isObjectLike(_.get(stat_data, '主角'))) _.set(stat_data, '主角', {});
+  if (!_.isObjectLike(_.get(stat_data, '主角.档案'))) _.set(stat_data, '主角.档案', {});
+
+  const fb = _.isObjectLike(fallback_stat) ? fallback_stat : {};
+  const build_started = Boolean(_.get(stat_data, '界面.建卡.已开始', false)) || Boolean(_.get(fb, '界面.建卡.已开始', false));
+  _.set(stat_data, '界面.建卡.已开始', build_started);
+
+  const profession = normalizeProfession(
+    pickNonEmpty(_.get(stat_data, '界面.建卡.职业'), _.get(fb, '界面.建卡.职业')),
+    pickNonEmpty(_.get(stat_data, '主角.档案.身份路径'), _.get(fb, '主角.档案.身份路径')),
+  );
+
+  const warmaid_type = pickNonEmpty(
+    _.get(stat_data, '界面.建卡.战姬类型'),
+    _.get(fb, '界面.建卡.战姬类型'),
+    String(_.get(stat_data, '主角.档案.身份路径', '')).replace(/^战姬-/, ''),
+    String(_.get(fb, '主角.档案.身份路径', '')).replace(/^战姬-/, ''),
+    '轻型',
+  );
+
+  const name = pickNonEmpty(
+    _.get(stat_data, '界面.建卡.角色姓名'),
+    _.get(stat_data, '主角.档案.代号'),
+    _.get(fb, '界面.建卡.角色姓名'),
+    _.get(fb, '主角.档案.代号'),
+    '待命战姬',
+  );
+
+  const gender = profession === '战姬'
+    ? '女性'
+    : pickNonEmpty(_.get(stat_data, '界面.建卡.性别'), _.get(fb, '界面.建卡.性别'), _.get(stat_data, '主角.档案.性别'), _.get(fb, '主角.档案.性别'), '男性');
+
+  const age_raw = asNumber(
+    pickNonEmpty(_.get(stat_data, '界面.建卡.年龄'), _.get(fb, '界面.建卡.年龄'), 21),
+    21,
+  );
+  const age = _.clamp(age_raw, 12, 80);
+
+  _.set(stat_data, '界面.建卡.职业', profession);
+  _.set(stat_data, '界面.建卡.战姬类型', warmaid_type);
+  _.set(stat_data, '界面.建卡.角色姓名', name);
+  _.set(stat_data, '界面.建卡.性别', gender);
+  _.set(stat_data, '界面.建卡.年龄', age);
+
+  _.set(stat_data, '主角.档案.代号', name);
+  _.set(stat_data, '主角.档案.性别', gender);
+  _.set(stat_data, '主角.档案.身份路径', profession === '战姬' ? `战姬-${warmaid_type}` : profession);
+}
+
 function pickTailEntries(source: unknown, keep = 2): Array<[string, string]> {
   if (!_.isObjectLike(source)) return [];
   return Object.entries(source as Record<string, unknown>)
@@ -2051,9 +2127,11 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   const world_weather = toShortText(_.get(stat, '世界.天气'));
   const world_threat = toShortText(_.get(stat, '世界.战区威胁等级', '中'));
 
-  const name = toShortText(_.get(stat, '主角.档案.姓名', _.get(stat, '界面.建卡.角色姓名')));
+  const name = toShortText(_.get(stat, '主角.档案.代号', _.get(stat, '界面.建卡.角色姓名')));
   const profession = toShortText(_.get(stat, '界面.建卡.职业'));
   const path = toShortText(_.get(stat, '主角.档案.身份路径'));
+  const gender = toShortText(_.get(stat, '界面.建卡.性别', _.get(stat, '主角.档案.性别', '未知')));
+  const age = toInt(_.get(stat, '界面.建卡.年龄', 0), 0);
 
   const hp = toInt(_.get(stat, '主角.资源.当前生命', 0), 0);
   const hp_max = toInt(_.get(stat, '主角.资源.最大生命', _.get(stat, '主角.资源.生命上限', hp)), hp);
@@ -2096,7 +2174,7 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   const lines = [
     '[MVU状态摘要-每轮必读]',
     `世界: 日期=${world_time} | 地点=${world_place} | 天气=${world_weather} | 威胁=${world_threat}`,
-    `主角: 姓名=${name} | 职业=${profession} | 身份=${path}`,
+    `主角: 姓名=${name} | 性别=${gender} | 年龄=${age} | 职业=${profession} | 身份=${path}`,
     `资源: HP=${hp}/${hp_max} | MP=${mp}/${mp_max} | AP=${action_point} | Move=${move_point} | 灵装槽=${slot_now}/${slot_max} | 污染=${corruption}`,
     `战术: 战斗中=${in_battle ? '是' : '否'} | 模式=${mode} | 阵线=${line} | 轮次=${round} | 制空=${air_sup} | 火力惩罚=${fire_penalty}`,
     `成长: 战姬老练=${warmaid_lv} | 权柄等级=${authority_lv} | 魔力碎片=${magic_shard}(下级需${next_magic_shard}) | 权柄碎片=${authority_shard} | 权柄本源=${has_origin ? '有' : '无'}`,
@@ -2129,7 +2207,8 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   }
 
   lines.push('要求: 优先遵循以上状态叙事，不得与状态冲突。');
-  lines.push('判定原则: 玩家先描述行动；若行动不可能/有代价/有风险，先明确告知。仅当玩家明确“要规避风险”时再掷骰。');
+  lines.push('身份硬约束: 你必须严格按“主角”行中的姓名/性别/职业进行叙事与称呼，不得回退为默认男性指挥官。');
+    lines.push('判定原则: 玩家先描述行动；若行动不可能/有代价/有风险，先明确告知。仅当玩家明确“要规避风险”时再掷骰。');
   lines.push('角色触发规范: 优先按自然叙事输出即可（系统会从中文正文自动识别在场角色）；若你愿意，也可在末尾附加 <OnStageCharacters>JSON数组提高稳定性。');
   lines.push('内心想法规范: 本轮若出现在场角色，必须给出其“本回合内心想法/心理动机”，并随回合刷新，不得长期复用旧句。');
   lines.push('地点硬限制: 角色“薇薇安娜·威曼普”仅允许在“威曼普城西侧·大图书馆”及其内部场景出现；若地点不在大图书馆，禁止让其出场或发言。');
@@ -2226,14 +2305,17 @@ $(() => {
       const source_data = anchor_assistant
         ? Mvu.getMvuData({ type: 'message', message_id: anchor_assistant.message_id })
         : Mvu.getMvuData({ type: 'chat' });
+      const chat_fallback_data = Mvu.getMvuData({ type: 'chat' });
       const next_data = _.cloneDeep(source_data ?? {});
       next_data.stat_data = _.isObjectLike(next_data?.stat_data) ? _.cloneDeep(next_data.stat_data) : {};
       ensureAirCombatData(next_data.stat_data);
       ensureNpcData(next_data.stat_data);
       ensureStoryGuideState(next_data.stat_data);
       resetNpcStateBeforeCreate(next_data.stat_data);
+      enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
       applyPlayerBackgroundInput(next_data.stat_data, source_content);
       ensureStoryGuideState(next_data.stat_data);
+      enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
       progressStoryGuideByContent(next_data.stat_data, source_content);
       advanceWorldTimeByAction(next_data.stat_data, source_content);
       const user_npc_request_hit = applyUserNpcRequest(next_data.stat_data, source_content);
@@ -2246,6 +2328,11 @@ $(() => {
       applyNpcPersonaConsistency(next_data.stat_data);
       applyHumanTraining(next_data.stat_data, source_content);
       reconcileGrowthLevel(next_data.stat_data);
+      enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
+      const stat_changed = !_.isEqual(
+        _.get(next_data, 'stat_data'),
+        _.get(source_data, 'stat_data', {}),
+      );
       const battle_started = startAirBattleIfTriggered(next_data.stat_data, source_content);
       const battle_resolved = resolveAirCombatRound(next_data.stat_data, source_content);
       const in_air_battle = Boolean(_.get(next_data.stat_data, '主角.战术.是否战斗中', false))
@@ -2264,7 +2351,7 @@ $(() => {
 
       const outcome = applySkillCheckSystem(next_data.stat_data, source_content);
       if (!outcome) {
-        if (user_npc_request_hit) {
+        if (user_npc_request_hit || stat_changed) {
           trimBattleLogs(next_data.stat_data, 3);
           await Mvu.replaceMvuData(next_data, { type: 'chat' });
           if (anchor_assistant) {
@@ -2334,6 +2421,8 @@ $(() => {
         ensureNpcData(new_data.stat_data);
         ensureStoryGuideState(new_data.stat_data);
         resetNpcStateBeforeCreate(new_data.stat_data);
+        const chat_snapshot = Mvu.getMvuData({ type: 'chat' });
+        enforcePlayerIdentity(new_data.stat_data, _.get(old_data, 'stat_data') ?? _.get(chat_snapshot, 'stat_data'));
         if (!new_data.stat_data.界面 || typeof new_data.stat_data.界面 !== 'object') {
           new_data.stat_data.界面 = {};
         }
@@ -2406,8 +2495,10 @@ $(() => {
           原文: content,
           更新时间: Date.now(),
         };
+        enforcePlayerIdentity(new_data.stat_data, _.get(old_data, 'stat_data') ?? _.get(chat_snapshot, 'stat_data'));
         trimBattleLogs(new_data.stat_data, 3);
 
+        await Mvu.replaceMvuData(new_data, { type: 'chat' });
         await Mvu.replaceMvuData(new_data, { type: 'message', message_id });
         synced_message_content.set(message_id, content);
         console.info(`[天启黎明][MVU桥接] 已同步楼层 ${message_id}`);

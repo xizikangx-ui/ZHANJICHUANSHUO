@@ -2311,6 +2311,11 @@ $(() => {
       ensureStoryGuideState(next_data.stat_data);
       resetNpcStateBeforeCreate(next_data.stat_data);
       enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
+      const build_started = Boolean(_.get(next_data.stat_data, '界面.建卡.已开始', false));
+      if (!build_started) {
+        processed_user_messages.add(message_id);
+        return;
+      }
       applyPlayerBackgroundInput(next_data.stat_data, source_content);
       ensureStoryGuideState(next_data.stat_data);
       enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
@@ -2474,7 +2479,6 @@ $(() => {
         const previous_message = getChatMessages(message_id - 1, { include_swipes: false })[0];
         const user_context = previous_message && previous_message.role === 'user' ? String(previous_message.message ?? '') : '';
         const trigger_context = `${user_context}\n${content}`;
-        const skill_context = user_context.trim() || content;
         const pending_skill = previous_message && previous_message.role === 'user'
           ? pending_skill_by_user_message.get(previous_message.message_id)
           : undefined;
@@ -2495,10 +2499,6 @@ $(() => {
             );
           }
           pending_skill_by_user_message.delete(previous_message.message_id);
-        } else {
-          const in_air_battle = Boolean(_.get(new_data.stat_data, '主角.战术.是否战斗中', false))
-            && _.get(new_data.stat_data, '主角.战术.战斗模式', '非战斗') === '空战';
-          if (!in_air_battle) applySkillCheckSystem(new_data.stat_data, skill_context);
         }
         enforceGameOver(new_data.stat_data, '生命值归零，本局立即结束。');
         applyNpcLongTermRules(new_data.stat_data, content, user_context, incoming_onstage, relation_hints);

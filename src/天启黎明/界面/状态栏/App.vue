@@ -255,7 +255,7 @@
           </div>
         </div>
       </section>
-      <section v-if="data.界面.游戏结束.已结束" class="gameover-banner">
+      <section v-if="data.界面.游戏结束.已结束 && data.主角.资源.当前生命 <= 0" class="gameover-banner">
         <h2>本局已结束</h2>
         <p>{{ data.界面.游戏结束.原因 || '生命值归零' }}</p>
       </section>
@@ -334,11 +334,14 @@
 
         <article>
           <h3>最近技能检定</h3>
-          <p>属性: {{ data.主角.技能检定.关联属性 }}</p>
-          <p>难度: {{ data.主角.技能检定.难度说明 }}（减值 {{ data.主角.技能检定.难度减值 }}）</p>
-          <p>骰点: {{ data.主角.技能检定.原始骰点 }} + {{ data.主角.技能检定.属性加值 }} - {{ data.主角.技能检定.难度减值 }} = {{ data.主角.技能检定.总值 }}</p>
-          <p>结果: {{ data.主角.技能检定.结果 }}</p>
-          <p>{{ data.主角.技能检定.结果描述 }}</p>
+          <p v-if="!has_real_skill_check">尚未进行检定</p>
+          <template v-else>
+            <p>属性: {{ data.主角.技能检定.关联属性 }}</p>
+            <p>难度: {{ data.主角.技能检定.难度说明 }}（减值 {{ data.主角.技能检定.难度减值 }}）</p>
+            <p>骰点: {{ data.主角.技能检定.原始骰点 }} + {{ data.主角.技能检定.属性加值 }} - {{ data.主角.技能检定.难度减值 }} = {{ data.主角.技能检定.总值 }}</p>
+            <p>结果: {{ data.主角.技能检定.结果 }}</p>
+            <p>{{ data.主角.技能检定.结果描述 }}</p>
+          </template>
         </article>
       </section>
 
@@ -374,11 +377,14 @@
 
         <article>
           <h3>最近技能检定</h3>
-          <p>属性: {{ data.主角.技能检定.关联属性 }}</p>
-          <p>难度: {{ data.主角.技能检定.难度说明 }}（减值 {{ data.主角.技能检定.难度减值 }}）</p>
-          <p>骰点: {{ data.主角.技能检定.原始骰点 }} + {{ data.主角.技能检定.属性加值 }} - {{ data.主角.技能检定.难度减值 }} = {{ data.主角.技能检定.总值 }}</p>
-          <p>结果: {{ data.主角.技能检定.结果 }}</p>
-          <p>{{ data.主角.技能检定.结果描述 }}</p>
+          <p v-if="!has_real_skill_check">尚未进行检定</p>
+          <template v-else>
+            <p>属性: {{ data.主角.技能检定.关联属性 }}</p>
+            <p>难度: {{ data.主角.技能检定.难度说明 }}（减值 {{ data.主角.技能检定.难度减值 }}）</p>
+            <p>骰点: {{ data.主角.技能检定.原始骰点 }} + {{ data.主角.技能检定.属性加值 }} - {{ data.主角.技能检定.难度减值 }} = {{ data.主角.技能检定.总值 }}</p>
+            <p>结果: {{ data.主角.技能检定.结果 }}</p>
+            <p>{{ data.主角.技能检定.结果描述 }}</p>
+          </template>
         </article>
 
         <article v-if="data.战利品.显示战利品" class="loot">
@@ -556,7 +562,30 @@ const warehouse_items = computed(() => {
     .filter(v => v.count > 0)
     .sort((a, b) => b.count - a.count);
 });
-const show_create = computed(() => !data.value.界面.建卡.已开始);
+function is_default_name(name: string): boolean {
+  const n = String(name ?? '').trim();
+  return !n || ['待命战姬', '玩家', '主角', '写卡助手'].includes(n);
+}
+
+const create_profile_valid = computed(() => {
+  const build = data.value.界面?.建卡 ?? ({} as any);
+  const started = Boolean(build.已开始);
+  if (!started) return false;
+  const profession_ok = build.职业 === '指挥官' || build.职业 === '战姬' || build.职业 === '权柄使役者';
+  const name_ok = !is_default_name(String(build.角色姓名 ?? ''));
+  const gender = String(build.性别 ?? '').trim();
+  const gender_ok = build.职业 === '战姬' ? gender === '女性' : (gender === '男性' || gender === '女性');
+  return profession_ok && name_ok && gender_ok;
+});
+
+const show_create = computed(() => !create_profile_valid.value);
+const has_real_skill_check = computed(() => {
+  const updated = Number((data.value as any).主角?.技能检定?.更新时间 ?? 0) > 0;
+  if (!updated) return false;
+  const desc = String((data.value as any).主角?.技能检定?.结果描述 ?? '');
+  if (/暂无检定|尚未检定|未进行检定/.test(desc)) return false;
+  return true;
+});
 
 const create_stage = ref<CreateStage>('cover');
 const create_error = ref('');
@@ -944,7 +973,8 @@ watch(
     if (draft_initialized.value) return;
 
     const saved = data.value.界面.建卡;
-    if (!saved || saved.已开始) return;
+    if (!saved) return;
+    if (saved.已开始 && create_profile_valid.value) return;
 
     create_form.角色姓名 = saved.角色姓名 || '';
     create_form.职业 = saved.职业;
@@ -968,10 +998,28 @@ function build_next_actions_from_reply(text: string): string[] {
   const t = text.trim();
   if (!t) return [...default_next_action_options];
 
+  const bad_action_pattern = /^(然后|于是|并且|但是|如果|所以|那就|这个|那个|开始|继续|现在|最后|本轮|本回合|进入《)/;
+  const action_noise_pattern = /(第一天|空档|流程|系统|提示|规则|变量|楼层|代码块|输出|模型|AI|助手)/;
+  const normalize_action = (raw: string): string => {
+    return String(raw ?? '')
+      .replace(/^[：:、，\-\s]+/, '')
+      .replace(/[：:、，\-\s]+$/, '')
+      .replace(/[。！？!?.]+$/g, '')
+      .trim();
+  };
+  const is_valid_action = (action: string): boolean => {
+    if (!action) return false;
+    if (action.length < 6 || action.length > 24) return false;
+    if (bad_action_pattern.test(action)) return false;
+    if (action_noise_pattern.test(action)) return false;
+    if (!/^(前往|查看|确认|申请|参加|进行|进入|整理|调查|检索|汇报|推进|联系|交流|侦查|领取|整备|休整|处理|提交|听取|学习|记录|询问|护送|护卫|训练)/.test(action)) return false;
+    return true;
+  };
+
   const pool: string[] = [];
   const pushUnique = (v: string) => {
-    const s = v.trim();
-    if (!s) return;
+    const s = normalize_action(v);
+    if (!is_valid_action(s)) return;
     if (!pool.includes(s)) pool.push(s);
   };
 
@@ -989,8 +1037,7 @@ function build_next_actions_from_reply(text: string): string[] {
           if (m2?.[0]) out.push(m2[0]);
           return out;
         })
-        .map(v => v.replace(/^[：:、，\s]+/, '').replace(/[：:、，\s]+$/, ''))
-        .filter(v => v.length >= 4 && v.length <= 22),
+        .map(normalize_action),
     ),
   );
   for (const candidate of direct_candidates) pushUnique(candidate);

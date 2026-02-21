@@ -1774,6 +1774,15 @@ function enforceGameOver(stat_data: any, reason: string): boolean {
   return true;
 }
 
+function normalizeGameOverState(stat_data: any): void {
+  const hp = asNumber(_.get(stat_data, '主角.资源.当前生命', 0), 0);
+  if (hp <= 0) return;
+  if (!Boolean(_.get(stat_data, '界面.游戏结束.已结束', false))) return;
+  _.set(stat_data, '界面.游戏结束.已结束', false);
+  _.set(stat_data, '界面.游戏结束.原因', '');
+  _.set(stat_data, '界面.游戏结束.时间戳', 0);
+}
+
 const battle_time_pattern = /空战|地面战|交战|战斗|接敌|敌袭|开火|突击|异种进攻|超视距空战|偷袭/i;
 const dialogue_time_pattern = /说|问|回答|交流|对话|聊天|询问|讨论|讲述|回复/i;
 const jump_time_pattern = /(?:跳过时间到|时间跳到|快进到|直接到)\s*([^\n，。,；;]+)/i;
@@ -2057,44 +2066,82 @@ function pickNonEmpty(...values: unknown[]): string {
   return '';
 }
 
-function enforcePlayerIdentity(stat_data: any, fallback_stat?: any): void {
+function isPlaceholderName(value: unknown): boolean {
+  const text = String(value ?? '').trim();
+  return !text || ['待命战姬', '写卡助手', '玩家', '主角'].includes(text);
+}
+
+function pickFirstValid(values: unknown[], invalid: (value: unknown) => boolean): string {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (!text) continue;
+    if (invalid(value)) continue;
+    return text;
+  }
+  return '';
+}
+
+function enforcePlayerIdentity(stat_data: any, ...fallback_stats: any[]): void {
   if (!_.isObjectLike(stat_data)) return;
   if (!_.isObjectLike(_.get(stat_data, '界面'))) _.set(stat_data, '界面', {});
   if (!_.isObjectLike(_.get(stat_data, '界面.建卡'))) _.set(stat_data, '界面.建卡', {});
   if (!_.isObjectLike(_.get(stat_data, '主角'))) _.set(stat_data, '主角', {});
   if (!_.isObjectLike(_.get(stat_data, '主角.档案'))) _.set(stat_data, '主角.档案', {});
 
-  const fb = _.isObjectLike(fallback_stat) ? fallback_stat : {};
-  const build_started = Boolean(_.get(stat_data, '界面.建卡.已开始', false)) || Boolean(_.get(fb, '界面.建卡.已开始', false));
+  const fallbacks = fallback_stats.filter(v => _.isObjectLike(v));
+  const build_started = Boolean(_.get(stat_data, '界面.建卡.已开始', false))
+    || fallbacks.some(fb => Boolean(_.get(fb, '界面.建卡.已开始', false)));
   _.set(stat_data, '界面.建卡.已开始', build_started);
 
+  if (!build_started) {
+    // 未完成建卡时不强行写入“默认男性指挥官”，避免AI误读。
+    if (isPlaceholderName(_.get(stat_data, '主角.档案.代号'))) _.set(stat_data, '主角.档案.代号', '');
+    if (!String(_.get(stat_data, '主角.档案.性别', '')).trim()) _.set(stat_data, '主角.档案.性别', '');
+    if (!String(_.get(stat_data, '主角.档案.身份路径', '')).trim()) _.set(stat_data, '主角.档案.身份路径', '');
+    return;
+  }
+
   const profession = normalizeProfession(
-    pickNonEmpty(_.get(stat_data, '界面.建卡.职业'), _.get(fb, '界面.建卡.职业')),
-    pickNonEmpty(_.get(stat_data, '主角.档案.身份路径'), _.get(fb, '主角.档案.身份路径')),
+    pickNonEmpty(
+      _.get(stat_data, '界面.建卡.职业'),
+      ...fallbacks.map(fb => _.get(fb, '界面.建卡.职业')),
+    ),
+    pickNonEmpty(
+      _.get(stat_data, '主角.档案.身份路径'),
+      ...fallbacks.map(fb => _.get(fb, '主角.档案.身份路径')),
+    ),
   );
 
   const warmaid_type = pickNonEmpty(
     _.get(stat_data, '界面.建卡.战姬类型'),
-    _.get(fb, '界面.建卡.战姬类型'),
+    ...fallbacks.map(fb => _.get(fb, '界面.建卡.战姬类型')),
     String(_.get(stat_data, '主角.档案.身份路径', '')).replace(/^战姬-/, ''),
-    String(_.get(fb, '主角.档案.身份路径', '')).replace(/^战姬-/, ''),
+    ...fallbacks.map(fb => String(_.get(fb, '主角.档案.身份路径', '')).replace(/^战姬-/, '')),
     '轻型',
   );
 
-  const name = pickNonEmpty(
+  const name = pickFirstValid([
     _.get(stat_data, '界面.建卡.角色姓名'),
     _.get(stat_data, '主角.档案.代号'),
-    _.get(fb, '界面.建卡.角色姓名'),
-    _.get(fb, '主角.档案.代号'),
-    '待命战姬',
-  );
+    ...fallbacks.map(fb => _.get(fb, '界面.建卡.角色姓名')),
+    ...fallbacks.map(fb => _.get(fb, '主角.档案.代号')),
+  ], isPlaceholderName) || '未命名';
 
   const gender = profession === '战姬'
     ? '女性'
-    : pickNonEmpty(_.get(stat_data, '界面.建卡.性别'), _.get(fb, '界面.建卡.性别'), _.get(stat_data, '主角.档案.性别'), _.get(fb, '主角.档案.性别'), '男性');
+    : pickFirstValid([
+      _.get(stat_data, '界面.建卡.性别'),
+      _.get(stat_data, '主角.档案.性别'),
+      ...fallbacks.map(fb => _.get(fb, '界面.建卡.性别')),
+      ...fallbacks.map(fb => _.get(fb, '主角.档案.性别')),
+    ], v => !['男性', '女性'].includes(String(v ?? '').trim())) || '男性';
 
   const age_raw = asNumber(
-    pickNonEmpty(_.get(stat_data, '界面.建卡.年龄'), _.get(fb, '界面.建卡.年龄'), 21),
+    pickNonEmpty(
+      _.get(stat_data, '界面.建卡.年龄'),
+      ...fallbacks.map(fb => _.get(fb, '界面.建卡.年龄')),
+      21,
+    ),
     21,
   );
   const age = _.clamp(age_raw, 12, 80);
@@ -2119,17 +2166,22 @@ function pickTailEntries(source: unknown, keep = 2): Array<[string, string]> {
 
 function buildMvuSummaryPrompt(chat_data: any): string {
   const stat = _.isObjectLike(chat_data?.stat_data) ? chat_data.stat_data : {};
+  const build_started = Boolean(_.get(stat, '界面.建卡.已开始', false));
 
   const world_time = toShortText(_.get(stat, '世界.当前时间', _.get(stat, '世界.日期')));
   const world_place = toShortText(_.get(stat, '世界.当前地点', _.get(stat, '世界.地点')));
   const world_weather = toShortText(_.get(stat, '世界.天气'));
   const world_threat = toShortText(_.get(stat, '世界.战区威胁等级', '中'));
 
-  const name = toShortText(_.get(stat, '主角.档案.代号', _.get(stat, '界面.建卡.角色姓名')));
-  const profession = toShortText(_.get(stat, '界面.建卡.职业'));
-  const path = toShortText(_.get(stat, '主角.档案.身份路径'));
-  const gender = toShortText(_.get(stat, '界面.建卡.性别', _.get(stat, '主角.档案.性别', '未知')));
-  const age = toInt(_.get(stat, '界面.建卡.年龄', 0), 0);
+  const name = build_started
+    ? toShortText(_.get(stat, '主角.档案.代号', _.get(stat, '界面.建卡.角色姓名')))
+    : '未建卡';
+  const profession = build_started ? toShortText(_.get(stat, '界面.建卡.职业')) : '未建卡';
+  const path = build_started ? toShortText(_.get(stat, '主角.档案.身份路径')) : '未建卡';
+  const gender = build_started
+    ? toShortText(_.get(stat, '界面.建卡.性别', _.get(stat, '主角.档案.性别', '未知')))
+    : '未设定';
+  const age = build_started ? toInt(_.get(stat, '界面.建卡.年龄', 0), 0) : 0;
 
   const hp = toInt(_.get(stat, '主角.资源.当前生命', 0), 0);
   const hp_max = toInt(_.get(stat, '主角.资源.最大生命', _.get(stat, '主角.资源.生命上限', hp)), hp);
@@ -2208,8 +2260,13 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   }
 
   lines.push('要求: 优先遵循以上状态叙事，不得与状态冲突。');
-  lines.push('身份硬约束: 你必须严格按“主角”行中的姓名/性别/职业进行叙事与称呼，不得回退为默认男性指挥官。');
-    lines.push('判定原则: 玩家先描述行动；若行动不可能/有代价/有风险，先明确告知。仅当玩家明确“要规避风险”时再掷骰。');
+  if (build_started) {
+    lines.push('身份硬约束: 你必须严格按“主角”行中的姓名/性别/职业进行叙事与称呼，不得回退为默认男性指挥官。');
+  } else {
+    lines.push('当前未完成建卡: 只允许推进建卡与入学手续，不得假定主角性别/职业。');
+  }
+  lines.push('判定原则: 玩家先描述行动；若行动不可能/有代价/有风险，先明确告知。仅当玩家明确“要规避风险”时再掷骰。');
+  lines.push('叙事风格: 使用自然、人性化表达；非战斗场景避免持续高压训斥和绝望基调，允许正常互动与缓冲节奏。');
   lines.push('角色触发规范: 优先按自然叙事输出即可（系统会从中文正文自动识别在场角色）；若你愿意，也可在末尾附加 <OnStageCharacters>JSON数组提高稳定性。');
   lines.push('内心想法规范: 本轮若出现在场角色，必须给出其“本回合内心想法/心理动机”，并随回合刷新，不得长期复用旧句。');
   lines.push('地点硬限制: 角色“薇薇安娜·威曼普”仅允许在“威曼普城西侧·大图书馆”及其内部场景出现；若地点不在大图书馆，禁止让其出场或发言。');
@@ -2314,6 +2371,7 @@ $(() => {
       ensureStoryGuideState(next_data.stat_data);
       resetNpcStateBeforeCreate(next_data.stat_data);
       enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
+      normalizeGameOverState(next_data.stat_data);
       const build_started = Boolean(_.get(next_data.stat_data, '界面.建卡.已开始', false));
       if (!build_started) {
         processed_user_messages.add(message_id);
@@ -2335,6 +2393,7 @@ $(() => {
       applyHumanTraining(next_data.stat_data, source_content);
       reconcileGrowthLevel(next_data.stat_data);
       enforcePlayerIdentity(next_data.stat_data, _.get(chat_fallback_data, 'stat_data'));
+      normalizeGameOverState(next_data.stat_data);
       const stat_changed = !_.isEqual(
         _.get(next_data, 'stat_data'),
         _.get(source_data, 'stat_data', {}),
@@ -2445,7 +2504,8 @@ $(() => {
         ensureStoryGuideState(new_data.stat_data);
         resetNpcStateBeforeCreate(new_data.stat_data);
         const chat_snapshot = Mvu.getMvuData({ type: 'chat' });
-        enforcePlayerIdentity(new_data.stat_data, _.get(old_data, 'stat_data') ?? _.get(chat_snapshot, 'stat_data'));
+        enforcePlayerIdentity(new_data.stat_data, _.get(chat_snapshot, 'stat_data'), _.get(old_data, 'stat_data'));
+        normalizeGameOverState(new_data.stat_data);
         if (!new_data.stat_data.界面 || typeof new_data.stat_data.界面 !== 'object') {
           new_data.stat_data.界面 = {};
         }
@@ -2504,6 +2564,7 @@ $(() => {
           pending_skill_by_user_message.delete(previous_message.message_id);
         }
         enforceGameOver(new_data.stat_data, '生命值归零，本局立即结束。');
+        normalizeGameOverState(new_data.stat_data);
         applyNpcLongTermRules(new_data.stat_data, content, user_context, incoming_onstage, relation_hints);
         applyVivianaArc(new_data.stat_data);
         applyNpcPersonaConsistency(new_data.stat_data);
@@ -2513,7 +2574,8 @@ $(() => {
           原文: content,
           更新时间: Date.now(),
         };
-        enforcePlayerIdentity(new_data.stat_data, _.get(old_data, 'stat_data') ?? _.get(chat_snapshot, 'stat_data'));
+        enforcePlayerIdentity(new_data.stat_data, _.get(chat_snapshot, 'stat_data'), _.get(old_data, 'stat_data'));
+        normalizeGameOverState(new_data.stat_data);
         trimBattleLogs(new_data.stat_data, 3);
 
         await Mvu.replaceMvuData(new_data, { type: 'chat' });
@@ -2590,7 +2652,8 @@ $(() => {
         void Mvu.replaceMvuData(next_chat_data, { type: 'chat' });
       }
       const ended = Boolean(_.get(chat_data, 'stat_data.界面.游戏结束.已结束', false));
-      if (ended) {
+      const hp_now = asNumber(_.get(chat_data, 'stat_data.主角.资源.当前生命', 1), 1);
+      if (ended && hp_now <= 0) {
         injectPrompts(
           [{
             id: `apocalypse-dawn-gameover-${Date.now()}`,

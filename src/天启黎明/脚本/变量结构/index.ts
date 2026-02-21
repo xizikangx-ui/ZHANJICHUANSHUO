@@ -236,7 +236,7 @@ function startAirBattleIfTriggered(stat_data: any, content: string): boolean {
 function resolveAirCombatRound(stat_data: any, content: string): boolean {
   ensureAirCombatData(stat_data);
   if (_.get(stat_data, '主角.战术.战斗模式', '非战斗') !== '空战') return false;
-  if (!Boolean(_.get(stat_data, '主角.战术.是否战斗中', false))) return false;
+  if (!_.get(stat_data, '主角.战术.是否战斗中', false)) return false;
   if (!battle_action_pattern.test(content) && !battle_end_pattern.test(content)) return false;
 
   const air = _.get(stat_data, '主角.战术.空战');
@@ -390,8 +390,8 @@ const npc_name_bad_contains = /(写卡助手|主角|玩家|新生|学员|守卫|
 function normalizeNpcName(raw: string): string {
   return String(raw ?? '')
     .trim()
-    .replace(/^[“"《【\[\(]+|[”"》】\]\)]+$/g, '')
-    .replace(/[，。！？；：、,\.\?!;:]/g, '')
+    .replace(/^[“"《【[(]+|[”"》】)\]]+$/g, '')
+    .replace(/[，。！？；：、,.?!;:]/g, '')
     .trim();
 }
 
@@ -496,7 +496,7 @@ function inferOnStageCharactersFromText(content: string, options?: { exclude_nam
       等级: String((old as any)?.等级 ?? '新手'),
       态度: old?.态度 || inferAttitudeByContext(context),
       内心想法: old?.内心想法 || (context ? `从当前楼层推断：${context}` : '从当前楼层推断中。'),
-      基础属性: _.isObjectLike(old?.基础属性) ? _.cloneDeep(old?.基础属性) : {},
+      基础属性: _.isObjectLike(old?.基础属性) ? (_.cloneDeep(old?.基础属性) as Record<string, number>) : {},
       更新时间: Date.now(),
     });
   }
@@ -589,7 +589,7 @@ function ensureNpcData(stat_data: any): void {
 
 function resetNpcStateBeforeCreate(stat_data: any): void {
   if (!stat_data || typeof stat_data !== 'object') return;
-  if (Boolean(_.get(stat_data, '界面.建卡.已开始', false))) return;
+  if (_.get(stat_data, '界面.建卡.已开始', false)) return;
   _.set(stat_data, '界面.在场角色', []);
   _.set(stat_data, '世界.长期NPC列表', {});
   _.set(stat_data, '世界.NPC关系追踪', {});
@@ -997,9 +997,9 @@ function rollRoomTypeByLuck(luck: number): '一般' | '不错' | '危险' | '隐
   // 权重1.0基准：隐藏1，不错2~3，一般4~7，陷阱/战斗8~9，危险10
   // 幸运偏转：每20幸运 +0.1，按规则把一般/危险向不错方向偏移
   const shift = Math.max(0, Math.floor(luck / 20));
-  let good_weight = 2 + shift;
-  let normal_weight = Math.max(1, 4 - shift);
-  let danger_weight = 1;
+  const good_weight = 2 + shift;
+  const normal_weight = Math.max(1, 4 - shift);
+  const danger_weight = 1;
   let risky_weight = 2;
   if (shift >= 2) {
     risky_weight = Math.max(1, risky_weight - Math.floor(shift / 2));
@@ -1023,11 +1023,11 @@ function buildRoomContainer(room_type: '一般' | '不错' | '危险' | '隐藏'
       : { 普通: 1, 高级: 1, 上锁: false, 已搜索: false };
   }
   if (room_type === '一般') return { 普通: 2, 高级: 0, 上锁: false, 已搜索: false };
-  const trap_or_danger = Math.random() < 0.7; // 陷阱/战斗房间可有1普通，纯危险房间无容器
-  return { 普通: trap_or_danger ? 1 : 0, 高级: 0, 上锁: false, 已搜索: false };
+  const has_loot = Math.random() < 0.7; // 陷阱/战斗房间可有1普通，纯危险房间无容器
+  return { 普通: has_loot ? 1 : 0, 高级: 0, 上锁: false, 已搜索: false };
 }
 
-function generateDungeonMap(level: (typeof lab_level_options)[number], scale: '小型' | '中型' | '大型', luck: number): any[] {
+function generateDungeonMap(scale: '小型' | '中型' | '大型', luck: number): any[] {
   const count = scale === '小型' ? 5 : scale === '中型' ? 12 : 20;
   const rooms: any[] = [];
   for (let i = 1; i <= count; i += 1) {
@@ -1155,7 +1155,7 @@ function applyDungeonLootSystem(stat_data: any, content: string): void {
   const luck = asNumber(_.get(stat_data, '主角.人类属性.感知', 1), 1) * 20;
 
   if (dungeon_enter_pattern.test(content)) {
-    const map = generateDungeonMap(level, scale, luck);
+    const map = generateDungeonMap(scale, luck);
     _.set(stat_data, '战利品.副本', {
       已激活: true,
       副本名称: '希尔顿实验室',
@@ -1173,7 +1173,7 @@ function applyDungeonLootSystem(stat_data: any, content: string): void {
     return;
   }
 
-  if (!Boolean(_.get(stat_data, '战利品.副本.已激活', false))) return;
+  if (!_.get(stat_data, '战利品.副本.已激活', false)) return;
   const rooms = _.get(stat_data, '战利品.副本.房间列表', []) as any[];
   if (!Array.isArray(rooms) || rooms.length === 0) return;
   let idx = _.clamp(asNumber(_.get(stat_data, '战利品.副本.当前房间索引', 0), 0), 0, rooms.length - 1);
@@ -1409,28 +1409,26 @@ function applyBattleSystemConstraints(stat_data: any, content: string): void {
   } else if (is_authority) {
     ap = 1;
     mp = 1;
-  } else {
-    if (warmaid_type === '侦察型') {
-      ap = 1; mp = 2;
-    } else if (warmaid_type === '轻型') {
-      ap = 2; mp = 1;
-    } else if (warmaid_type === '中型') {
-      ap = 1; mp = 1;
-    } else if (warmaid_type === '重型') {
-      ap = 1;
-      const move_counter = asNumber(_.get(stat_data, '主角.战术.重型移动计数', 0), 0) + 1;
-      _.set(stat_data, '主角.战术.重型移动计数', move_counter % 2);
-      mp = move_counter % 2 === 0 ? 1 : 0;
-      if (line === '前线') penalty = '重型前线火力惩罚：伤害骰-1/3';
-      if (line === '交锋区') penalty = '重型交锋区火力惩罚：伤害骰-1/2';
-    } else if (warmaid_type === '要塞型') {
-      ap = 1;
-      mp = 0;
-      if (line === '中线') penalty = '要塞中线火力惩罚：伤害骰-1/2';
-      if (line === '前线' || line === '交锋区') penalty = '要塞前线/交锋区仅可使用自卫灵装';
-    } else if (warmaid_type === '地面支援姬') {
-      ap = 1; mp = 1;
-    }
+  } else if (warmaid_type === '侦察型') {
+    ap = 1; mp = 2;
+  } else if (warmaid_type === '轻型') {
+    ap = 2; mp = 1;
+  } else if (warmaid_type === '中型') {
+    ap = 1; mp = 1;
+  } else if (warmaid_type === '重型') {
+    ap = 1;
+    const move_counter = asNumber(_.get(stat_data, '主角.战术.重型移动计数', 0), 0) + 1;
+    _.set(stat_data, '主角.战术.重型移动计数', move_counter % 2);
+    mp = move_counter % 2 === 0 ? 1 : 0;
+    if (line === '前线') penalty = '重型前线火力惩罚：伤害骰-1/3';
+    if (line === '交锋区') penalty = '重型交锋区火力惩罚：伤害骰-1/2';
+  } else if (warmaid_type === '要塞型') {
+    ap = 1;
+    mp = 0;
+    if (line === '中线') penalty = '要塞中线火力惩罚：伤害骰-1/2';
+    if (line === '前线' || line === '交锋区') penalty = '要塞前线/交锋区仅可使用自卫灵装';
+  } else if (warmaid_type === '地面支援姬') {
+    ap = 1; mp = 1;
   }
 
   _.set(stat_data, '主角.资源.行动点', ap);
@@ -1636,7 +1634,7 @@ function resolveSkillOutcome(stat_data: any, content: string, raw_override?: num
     };
   }
 
-  const bonus = attr === '无' ? 0 : asNumber(_.get(stat_data, `主角.人类属性.${attr}`, 0), 0);
+  const bonus = asNumber(_.get(stat_data, `主角.人类属性.${attr}`, 0), 0);
   const difficulty = inferDifficulty(content, attr);
   const raw = _.clamp(raw_override ?? rollD10(), 1, 10);
   const total = Math.max(0, raw + bonus - difficulty.penalty);
@@ -2351,6 +2349,7 @@ $(() => {
 
       const outcome = applySkillCheckSystem(next_data.stat_data, source_content);
       if (!outcome) {
+        processed_user_messages.add(message_id);
         if (user_npc_request_hit || stat_changed) {
           trimBattleLogs(next_data.stat_data, 3);
           await Mvu.replaceMvuData(next_data, { type: 'chat' });
@@ -2393,6 +2392,22 @@ $(() => {
         await Mvu.replaceMvuData(next_data, { type: 'message', message_id: anchor_assistant.message_id });
       }
       console.info(`[天启黎明][检定前置] 已处理玩家动作楼层 ${message_id}`);
+    }
+
+    function injectMvuSummaryForUserMessage(user_message_id: number): void {
+      const chat_data = Mvu.getMvuData({ type: 'chat' });
+      const mvu_summary_prompt = buildMvuSummaryPrompt(chat_data);
+      injectPrompts(
+        [{
+          id: `apocalypse-dawn-mvu-summary-${user_message_id}-${Date.now()}`,
+          position: 'in_chat',
+          depth: 0,
+          role: 'system',
+          content: mvu_summary_prompt,
+          should_scan: true,
+        }],
+        { once: true },
+      );
     }
 
     async function syncMessageToMvu(message_id: number): Promise<void> {
@@ -2519,25 +2534,16 @@ $(() => {
 
     eventOn(tavern_events.MESSAGE_SENT, message_id => {
       void processUserAction(message_id);
+      // 尽早注入本轮MVU摘要，避免某些模型/预设下 after_commands 不触发。
+      injectMvuSummaryForUserMessage(message_id);
     });
 
     eventOn(tavern_events.GENERATION_AFTER_COMMANDS, () => {
       const latest_user = getChatMessages(-1, { role: 'user', include_swipes: false })[0];
       if (!latest_user || latest_user.role !== 'user') return;
+      injectMvuSummaryForUserMessage(latest_user.message_id);
 
       const chat_data = Mvu.getMvuData({ type: 'chat' });
-      const mvu_summary_prompt = buildMvuSummaryPrompt(chat_data);
-      injectPrompts(
-        [{
-          id: `apocalypse-dawn-mvu-summary-${latest_user.message_id}-${Date.now()}`,
-          position: 'in_chat',
-          depth: 0,
-          role: 'system',
-          content: mvu_summary_prompt,
-          should_scan: true,
-        }],
-        { once: true },
-      );
 
       const pending = pending_skill_by_user_message.get(latest_user.message_id);
       if (pending && !pending.injected) {
@@ -2618,10 +2624,19 @@ $(() => {
       if (!latest_message || latest_message.role !== 'assistant' || latest_message.is_hidden) return;
       void syncMessageToMvu(latest_message.message_id);
     }, 1500);
+    // 兜底轮询：防止 MESSAGE_SENT 漏事件导致“无检定/无战斗流程/不推进变量”。
+    const user_action_poll_timer = window.setInterval(() => {
+      const latest_user = getChatMessages(-1, { role: 'user', include_swipes: false })[0];
+      if (!latest_user || latest_user.role !== 'user' || latest_user.is_hidden) return;
+      if (processed_user_messages.has(latest_user.message_id)) return;
+      void processUserAction(latest_user.message_id);
+      injectMvuSummaryForUserMessage(latest_user.message_id);
+    }, 1200);
     window.addEventListener(
       'beforeunload',
       () => {
         window.clearInterval(fallback_poll_timer);
+        window.clearInterval(user_action_poll_timer);
       },
       { once: true },
     );

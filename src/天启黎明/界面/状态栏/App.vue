@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="card" :class="{ fullscreen: is_fullscreen }">
+  <div class="card" :class="{ fullscreen: is_fullscreen, 'mobile-mode': mobile_mode }">
     <section v-if="show_create" class="create-flow">
       <section v-if="create_stage === 'cover'" class="cover-panel">
         <h1 class="logo">天启黎明</h1>
@@ -8,6 +8,9 @@
           <button type="button" class="start-btn large" @click="create_stage = 'profile'">开始游戏</button>
           <button type="button" class="plot-btn large" :class="{ active: plot_mode }" @click="toggle_plot_mode">
             {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
+          </button>
+          <button type="button" class="mobile-btn large" :class="{ active: mobile_mode }" @click="toggle_mobile_mode">
+            {{ mobile_mode ? '手机适配：开启' : '手机适配：关闭' }}
           </button>
         </div>
         <button type="button" class="cheat-btn" :class="{ active: cheat_mode }" @click="cheat_mode = !cheat_mode">
@@ -234,9 +237,14 @@
       <section class="mvu-textbox">
         <div class="mvu-toolbar">
           <h2>MVU正文与可选行动</h2>
-          <button type="button" class="plot-btn" :class="{ active: plot_mode }" @click="toggle_plot_mode">
-            {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
-          </button>
+          <div class="mvu-toolbar-actions">
+            <button type="button" class="plot-btn" :class="{ active: plot_mode }" @click="toggle_plot_mode">
+              {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
+            </button>
+            <button type="button" class="mobile-btn" :class="{ active: mobile_mode }" @click="toggle_mobile_mode">
+              {{ mobile_mode ? '手机适配：开启' : '手机适配：关闭' }}
+            </button>
+          </div>
         </div>
         <pre v-if="display_floor_text" class="mvu-body">{{ display_floor_text }}</pre>
         <p v-else class="empty-tip">当前暂无可展示正文</p>
@@ -540,6 +548,7 @@ type WarmaidStats = Record<WarmaidAttrKey, number>;
 const store = useDataStore();
 const data = computed(() => store.data);
 const is_fullscreen = useLocalStorage('apocalypse_dawn:status_fullscreen', false);
+const mobile_mode = useLocalStorage('apocalypse_dawn:mobile_mode', false);
 const active_tab = useLocalStorage<'main' | 'battle' | 'recent' | 'warehouse'>('apocalypse_dawn:active_tab', 'main');
 const display_floor_text = computed(() => {
   const direct = String(data.value.界面.楼层文本.正文 ?? '').trim();
@@ -1784,6 +1793,10 @@ async function use_warehouse_item(item_name: string): Promise<void> {
     '我使用大图书馆邀请函，前往威曼普城西侧大图书馆外馆，请按规则引导我入馆并说明当前可进入区域（外馆/内馆权限）。';
   await send_next_action(action);
 }
+
+function toggle_mobile_mode(): void {
+  mobile_mode.value = !mobile_mode.value;
+}
 </script>
 
 <style scoped>
@@ -1934,6 +1947,24 @@ async function use_warehouse_item(item_name: string): Promise<void> {
   font-size: 16px;
   padding: 10px 20px;
 }
+.mobile-btn {
+  border: 1px solid #4a6b3a;
+  background: #f2fff0;
+  color: #315326;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mobile-btn.active {
+  background: #2f6e44;
+  color: #fff;
+  border-color: #2f6e44;
+}
+.mobile-btn.large {
+  font-size: 16px;
+  padding: 10px 20px;
+}
 .cheat-btn {
   border: 1px solid #b03333;
   background: #fff1f1;
@@ -2032,6 +2063,13 @@ async function use_warehouse_item(item_name: string): Promise<void> {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+}
+.mvu-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .next-actions {
   padding: 12px;
@@ -2315,13 +2353,279 @@ article h3,
   border-color: #a23333;
   background: #ffecec;
 }
+
+.card.mobile-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  border-width: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.card.mobile-mode .create-flow,
+.card.mobile-mode .panel,
+.card.mobile-mode .mvu-textbox,
+.card.mobile-mode .next-actions,
+.card.mobile-mode .onstage-box {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.card.mobile-mode .cover-panel {
+  min-height: 280px;
+  gap: 10px;
+  padding: 12px 10px;
+}
+.card.mobile-mode .logo {
+  font-size: clamp(30px, 9vw, 56px);
+  letter-spacing: 3px;
+  text-align: center;
+}
+.card.mobile-mode .author {
+  font-size: 14px;
+}
+.card.mobile-mode .cover-actions,
+.card.mobile-mode .actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+}
+.card.mobile-mode .cover-actions > button,
+.card.mobile-mode .actions > button,
+.card.mobile-mode .plot-btn,
+.card.mobile-mode .mobile-btn,
+.card.mobile-mode .fullscreen-btn,
+.card.mobile-mode .toggle-btn {
+  width: 100%;
+  text-align: center;
+}
+.card.mobile-mode .create-panel {
+  padding: 10px;
+  gap: 10px;
+}
+.card.mobile-mode .create-panel h2 {
+  font-size: 18px;
+}
+.card.mobile-mode .field input,
+.card.mobile-mode .field select,
+.card.mobile-mode .field textarea {
+  font-size: 14px;
+  padding: 8px 9px;
+}
+.card.mobile-mode .allocate-list li,
+.card.mobile-mode .dice-rule-list li,
+.card.mobile-mode .dice-result-list li {
+  align-items: flex-start;
+  flex-direction: column;
+}
+.card.mobile-mode .counter {
+  align-self: flex-end;
+}
+.card.mobile-mode .mvu-toolbar {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 6px;
+}
+.card.mobile-mode .mvu-toolbar h2 {
+  margin-bottom: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.card.mobile-mode .mvu-toolbar-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+}
+.card.mobile-mode .mvu-body {
+  font-size: 12px;
+  line-height: 1.45;
+  max-height: 180px;
+  padding: 8px;
+}
+.card.mobile-mode .next-actions h3 {
+  font-size: 12px;
+  line-height: 1.3;
+}
+.card.mobile-mode .next-actions-grid {
+  grid-template-columns: 1fr;
+}
+.card.mobile-mode .next-action-btn {
+  font-size: 12px;
+  padding: 9px;
+}
+.card.mobile-mode .hero {
+  align-items: flex-start;
+  flex-direction: column;
+  padding: 10px;
+}
+.card.mobile-mode .hero h1 {
+  font-size: 20px;
+}
+.card.mobile-mode .hero-controls {
+  width: 100%;
+  flex-wrap: wrap;
+}
+.card.mobile-mode .hero-controls > * {
+  flex: 1 1 auto;
+}
+.card.mobile-mode .world {
+  grid-template-columns: 1fr;
+  padding: 8px;
+}
+.card.mobile-mode .tabs {
+  gap: 6px;
+  padding: 8px;
+  flex-wrap: wrap;
+}
+.card.mobile-mode .tabs button {
+  flex: 1 1 calc(50% - 6px);
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.2;
+}
+.card.mobile-mode .grid.two {
+  grid-template-columns: 1fr;
+}
+.card.mobile-mode .bar {
+  grid-template-columns: 42px 1fr;
+}
+.card.mobile-mode .bar-value {
+  grid-column: 1 / -1;
+  text-align: left;
+  min-width: 0;
+}
+.card.mobile-mode article,
+.card.mobile-mode .loot {
+  padding: 8px;
+}
+.card.mobile-mode .mvu-textbox,
+.card.mobile-mode .next-actions,
+.card.mobile-mode .panel,
+.card.mobile-mode .world,
+.card.mobile-mode .tabs,
+.card.mobile-mode .hero {
+  width: 100%;
+  max-width: 100%;
+}
+.card.mobile-mode .create-flow,
+.card.mobile-mode .create-panel,
+.card.mobile-mode .mvu-toolbar,
+.card.mobile-mode .mvu-body,
+.card.mobile-mode .next-actions-grid {
+  min-width: 0;
+}
+.card.mobile-mode .plot-btn,
+.card.mobile-mode .mobile-btn {
+  white-space: normal;
+  line-height: 1.2;
+}
+.card.mobile-mode .kv li {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}
+.card.mobile-mode .kv li strong {
+  text-align: left;
+}
+
 @media (max-width: 560px) {
+  .card {
+    border-width: 1px;
+    border-radius: 10px;
+  }
+  .create-flow,
+  .panel,
+  .mvu-textbox,
+  .next-actions,
+  .onstage-box {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .create-panel {
+    padding: 10px;
+  }
+  .create-panel h2 {
+    font-size: 18px;
+  }
+  .logo {
+    font-size: clamp(30px, 9vw, 58px);
+    letter-spacing: 4px;
+    text-align: center;
+  }
+  .cover-panel {
+    min-height: 300px;
+    gap: 12px;
+    padding: 12px 10px;
+  }
+  .cover-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  .cover-actions > button,
+  .cheat-btn {
+    width: 100%;
+  }
+  .mvu-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mvu-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .mvu-body {
+    font-size: 12px;
+    max-height: 190px;
+    padding: 8px;
+  }
+  .next-actions {
+    padding: 8px;
+  }
+  .next-actions h3 {
+    font-size: 12px;
+  }
   .hero {
     align-items: flex-start;
     flex-direction: column;
   }
   .tabs {
     flex-wrap: wrap;
+  }
+  .tabs button {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+    white-space: normal;
+  }
+  .world {
+    grid-template-columns: 1fr;
+  }
+  .grid.two {
+    grid-template-columns: 1fr;
+  }
+  .bar {
+    grid-template-columns: 42px 1fr;
+  }
+  .bar-value {
+    grid-column: 1 / -1;
+    text-align: left;
+    min-width: 0;
+  }
+  .kv li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .kv li strong {
+    text-align: left;
   }
   .next-actions-grid {
     grid-template-columns: 1fr;

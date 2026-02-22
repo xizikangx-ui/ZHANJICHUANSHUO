@@ -72,7 +72,10 @@
 
         <ul class="allocate-list">
           <li v-for="key in human_keys" :key="key">
-            <span>{{ key }}（上限 {{ human_caps[key] }}）</span>
+            <div class="human-attr-meta">
+              <span>{{ key }}（上限 {{ human_caps[key] }}）</span>
+              <small class="human-attr-desc">{{ human_attr_desc[key].用途 }}</small>
+            </div>
             <div class="counter">
               <button type="button" @click="change_human(key, -1)">-</button>
               <strong>{{ human_attr[key] }}</strong>
@@ -80,6 +83,15 @@
             </div>
           </li>
         </ul>
+        <details class="human-attr-help">
+          <summary>查看七项人类属性说明（建卡参考）</summary>
+          <ul class="human-attr-help-list">
+            <li v-for="key in human_keys" :key="`help-${key}`">
+              <strong>{{ key }}</strong>
+              <span>{{ human_attr_desc[key].说明 }}</span>
+            </li>
+          </ul>
+        </details>
 
         <p v-if="create_error" class="error">{{ create_error }}</p>
         <div class="actions">
@@ -189,6 +201,14 @@
       <section v-else-if="create_stage === 'background'" class="create-panel">
         <h2>建卡 - 人物背景</h2>
         <p class="tip">可填写约1000字背景。武器/能力/装备将被过滤，不计入有效背景。</p>
+        <div class="background-template-box">
+          <p class="tip strong">职业通用背景开局（参照世界书模板）</p>
+          <div class="background-template-actions">
+            <button type="button" class="secondary-btn" @click="apply_background_starter(false)">填入模板（覆盖）</button>
+            <button type="button" class="secondary-btn" @click="apply_background_starter(true)">填入模板（追加）</button>
+          </div>
+          <pre class="example-box background-template-preview">{{ profession_background_starter }}</pre>
+        </div>
         <label class="field">
           <span>背景原文：</span>
           <textarea v-model.trim="background_input" rows="12" maxlength="1200" placeholder="输入角色背景（约1000字）" />
@@ -234,10 +254,13 @@
     </section>
 
     <template v-else>
-      <section class="mvu-textbox">
+      <section class="mvu-textbox" :class="{ 'mvu-focus-mode': is_initial_mvu_focus_mode }">
         <div class="mvu-toolbar">
           <h2>MVU正文与可选行动</h2>
           <div class="mvu-toolbar-actions">
+            <button type="button" class="status-toggle-btn" :class="{ active: !status_bar_collapsed }" @click="toggle_status_bar">
+              {{ status_bar_collapsed ? '状态栏：展开' : '状态栏：收起' }}
+            </button>
             <button type="button" class="plot-btn" :class="{ active: plot_mode }" @click="toggle_plot_mode">
               {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
             </button>
@@ -246,9 +269,22 @@
             </button>
           </div>
         </div>
-        <pre v-if="display_floor_text" class="mvu-body">{{ display_floor_text }}</pre>
+        <div class="mvu-font-tools">
+          <span class="mvu-font-label">字体：</span>
+          <button
+            v-for="size in mvu_font_size_options"
+            :key="size.key"
+            type="button"
+            class="font-size-btn"
+            :class="{ active: mvu_font_size === size.key }"
+            @click="mvu_font_size = size.key"
+          >
+            {{ size.label }}
+          </button>
+        </div>
+        <pre v-if="display_floor_text" class="mvu-body" :class="`mvu-font-${mvu_font_size}`">{{ display_floor_text }}</pre>
         <p v-else class="empty-tip">当前暂无可展示正文</p>
-        <div class="next-actions">
+        <div class="next-actions" :class="{ compact: is_initial_mvu_focus_mode }">
           <h3>接下来可进行（自动生成，可点击）</h3>
           <div class="next-actions-grid">
             <button
@@ -268,6 +304,11 @@
         <p>{{ data.界面.游戏结束.原因 || '生命值归零' }}</p>
       </section>
 
+      <section v-if="status_bar_collapsed" class="status-collapsed-banner">
+        <p>状态栏已收起（MVU正文保留显示）</p>
+      </section>
+
+      <template v-if="!status_bar_collapsed">
       <header class="hero">
         <div>
           <h1>天启黎明</h1>
@@ -525,6 +566,7 @@
           </li>
         </ul>
       </section>
+      </template>
     </template>
   </div>
 </template>
@@ -549,6 +591,8 @@ const store = useDataStore();
 const data = computed(() => store.data);
 const is_fullscreen = useLocalStorage('apocalypse_dawn:status_fullscreen', false);
 const mobile_mode = useLocalStorage('apocalypse_dawn:mobile_mode', false);
+const status_bar_collapsed = useLocalStorage('apocalypse_dawn:status_collapsed', true);
+const mvu_font_size = useLocalStorage<'sm' | 'md' | 'lg' | 'xl'>('apocalypse_dawn:mvu_font_size', 'md');
 const active_tab = useLocalStorage<'main' | 'battle' | 'recent' | 'warehouse'>('apocalypse_dawn:active_tab', 'main');
 const display_floor_text = computed(() => {
   const direct = String(data.value.界面.楼层文本.正文 ?? '').trim();
@@ -562,6 +606,7 @@ const default_next_action_options = [
   '与在场角色进行交流',
 ];
 const next_action_options = ref<string[]>([...default_next_action_options]);
+const is_initial_mvu_focus_mode = computed(() => status_bar_collapsed.value);
 const onstage_characters = computed(() => {
   const list = data.value.界面.在场角色;
   return Array.isArray(list) ? list : [];
@@ -630,6 +675,21 @@ const draft_initialized = ref(false);
 
 const warmaid_types: WarmaidType[] = ['侦察型', '轻型', '中型', '重型', '要塞型', '地面支援姬'];
 const human_keys: HumanKey[] = ['力量', '敏捷', '体质', '感知', '意志', '魅力', '学识'];
+const human_attr_desc: Record<HumanKey, { 用途: string; 说明: string }> = {
+  力量: { 用途: '发力、搬运、破坏、近身施力动作。', 说明: '决定角色在推、拉、搬、攀、撞击、近身压制等需要纯粹发力场景中的稳定性与上限。' },
+  敏捷: { 用途: '闪避、平衡、精细动作、快速位移。', 说明: '影响角色反应、身法、手眼协调与危险环境中的身体控制能力。' },
+  体质: { 用途: '生命、耐受、恢复、抗疲劳。', 说明: '决定生命上限、体力承受能力与长时间行动后的状态稳定性，是生存核心属性之一。' },
+  感知: { 用途: '观察、警觉、追踪线索、环境判断。', 说明: '用于发现异常、察觉伏击、读取场景细节、捕捉声音与气味等侦知行为。' },
+  意志: { 用途: '抗压、抗恐惧、坚持、精神稳定。', 说明: '决定角色在高压、污染、恐惧、诱导与痛苦环境中的精神稳定与执行能力。' },
+  魅力: { 用途: '交流、说服、安抚、建立关系。', 说明: '影响社交表达、亲和力、谈判氛围与他人对你的初始接受度。' },
+  学识: { 用途: '课程学习、推理、记忆、理论判断。', 说明: '决定对异种学、数学、物理、化学、权柄理论等知识内容的理解、检索与应用。' },
+};
+const mvu_font_size_options = [
+  { key: 'sm', label: '小' },
+  { key: 'md', label: '中' },
+  { key: 'lg', label: '大' },
+  { key: 'xl', label: '特大' },
+] as const;
 const air_phase_options = ['遭遇', '行动点计算', '站位划分', '制空判定', '行动序列', '回合执行', '空战结算'] as const;
 const air_layer_options = ['湍流层', '云层', '高空', '标准空域', '低空', '地面'] as const;
 const scout_unit_options = ['侦察型', '轻型', '中型', '重型及以上'] as const;
@@ -754,6 +814,11 @@ const opening_story = `【联合纪年177年8月28日】
 如果光明大圣堂沦陷，整个北部防线有被以点带面凿穿的风险，威曼普城同样根据【第二协议】的条款，派出了【海洋】【魔法支点】【学士】三个结社前往支援。
 而除了这些明面上的力量，新生也不可避免的被卷入了这场漩涡，正面战场也许很难帮得上忙，但是，繁杂的侦查，辅助，探索，清理少量异种的任务，还是不可避免的向你们袭来。
 而幸运与不幸的是，你们这支新成立的学员小队，恰巧成为了最前端的侦察小队，即将承接可能带来最丰厚报偿，也可能是送命的侦查任务……`;
+const profession_background_starters: Record<Profession, string> = {
+  指挥官: `【指挥官通用背景开局】\n我来自联合或大公国体系下的普通教育与基础军训环境，在进入威曼普学院前已接受过基础纪律、地图判读、队列协同或后勤常识训练，但并非前线老兵。被送入战姬学院后，我的核心目标是尽快完成指挥链路适配，学会与战姬小队稳定协同，并在真实任务中证明自己不是拖后腿的人。`,
+  战姬: `【战姬通用背景开局】\n我在近期完成觉醒，被地方机构登记后依照【第二协议】送往威曼普学院。觉醒带来的力量让我既兴奋又不安：身体感知、魔力流动与情绪波动都和过去不同。入学后我需要尽快完成灵装适配、基础战术训练和小队磨合，学会在危险世界里使用这份力量而不是被它拖垮。`,
+  权柄使役者: `【权柄使役者通用背景开局】\n我作为新入门的权柄使役者（或家族传承的低阶使役者）被纳入学院体系，拥有初步仪式经验或象征性施术认知，但仍缺乏系统战术训练。进入威曼普学院后，我需要在课程与任务中学会控制代价、理解协同规则，并证明自己能在战场边缘与侦查任务中稳定发挥作用。`,
+};
 
 const create_form = reactive({
   角色姓名: '',
@@ -1797,6 +1862,22 @@ async function use_warehouse_item(item_name: string): Promise<void> {
 function toggle_mobile_mode(): void {
   mobile_mode.value = !mobile_mode.value;
 }
+
+function toggle_status_bar(): void {
+  status_bar_collapsed.value = !status_bar_collapsed.value;
+}
+
+const profession_background_starter = computed(() => profession_background_starters[create_form.职业]);
+
+function apply_background_starter(append: boolean): void {
+  const starter = profession_background_starter.value.trim();
+  if (!starter) return;
+  if (!append || !background_input.value.trim()) {
+    background_input.value = starter;
+    return;
+  }
+  background_input.value = `${background_input.value.trim()}\n\n${starter}`;
+}
 </script>
 
 <style scoped>
@@ -1983,6 +2064,19 @@ function toggle_mobile_mode(): void {
   background: #fff;
   color: #2f4048;
 }
+.status-toggle-btn {
+  border: 1px solid #6a5c2d;
+  background: #fff8db;
+  color: #5c4a16;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.status-toggle-btn.active {
+  background: #6a5c2d;
+  color: #fff;
+}
 .allocate-list,
 .ability-list,
 .skill-list,
@@ -2044,6 +2138,59 @@ function toggle_mobile_mode(): void {
   gap: 8px;
   align-items: center;
 }
+.human-attr-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.human-attr-desc {
+  font-size: 11px;
+  color: #5f7079;
+  line-height: 1.35;
+}
+.human-attr-help {
+  border: 1px dashed #b8a589;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fffaf4;
+}
+.human-attr-help summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #7c2610;
+}
+.human-attr-help-list {
+  margin-top: 8px;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.human-attr-help-list li {
+  display: grid;
+  gap: 2px;
+}
+.human-attr-help-list li span {
+  font-size: 12px;
+  color: #4d5d67;
+  line-height: 1.4;
+}
+.background-template-box {
+  border: 1px dashed #8b9aa4;
+  border-radius: 10px;
+  background: #f8fcff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+.background-template-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.background-template-preview {
+  max-height: 150px;
+  overflow: auto;
+}
 .counter button {
   width: 24px;
   height: 24px;
@@ -2056,6 +2203,12 @@ function toggle_mobile_mode(): void {
   padding: 12px;
   border-bottom: 1px dashed #7d8a90;
   background: #fffef8;
+}
+.mvu-textbox.mvu-focus-mode {
+  min-height: clamp(340px, 62vh, 760px);
+  display: grid;
+  grid-template-rows: auto auto minmax(180px, 1fr) auto;
+  align-content: start;
 }
 .mvu-toolbar {
   display: flex;
@@ -2070,6 +2223,32 @@ function toggle_mobile_mode(): void {
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+.mvu-font-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.mvu-font-label {
+  font-size: 12px;
+  color: var(--c-sub);
+}
+.font-size-btn {
+  border: 1px solid #60707a;
+  background: #fff;
+  color: #34434b;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.font-size-btn.active {
+  border-color: #2f4f62;
+  background: #eaf5ff;
+  color: #15384f;
+  font-weight: 700;
 }
 .next-actions {
   padding: 12px;
@@ -2178,6 +2357,45 @@ function toggle_mobile_mode(): void {
   border: 1px solid #4f5d64;
   border-radius: 8px;
   background: #ffffff;
+}
+.mvu-textbox.mvu-focus-mode .mvu-body {
+  max-height: none;
+  min-height: 0;
+  height: 100%;
+}
+.next-actions.compact {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.mvu-textbox.mvu-focus-mode .next-actions {
+  border-bottom: 0;
+  margin-top: 6px;
+}
+.mvu-body.mvu-font-sm {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.mvu-body.mvu-font-md {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.mvu-body.mvu-font-lg {
+  font-size: 15px;
+  line-height: 1.65;
+}
+.mvu-body.mvu-font-xl {
+  font-size: 17px;
+  line-height: 1.75;
+}
+.status-collapsed-banner {
+  padding: 10px 12px;
+  border-bottom: 1px dashed #7d8a90;
+  background: #f6fbff;
+}
+.status-collapsed-banner p {
+  margin: 0;
+  font-size: 12px;
+  color: #4e6070;
 }
 .gameover-banner {
   padding: 12px;
@@ -2397,9 +2615,15 @@ article h3,
   grid-template-columns: 1fr;
   width: 100%;
 }
+.card.mobile-mode .background-template-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
 .card.mobile-mode .cover-actions > button,
 .card.mobile-mode .actions > button,
+.card.mobile-mode .background-template-actions > button,
 .card.mobile-mode .plot-btn,
+.card.mobile-mode .status-toggle-btn,
 .card.mobile-mode .mobile-btn,
 .card.mobile-mode .fullscreen-btn,
 .card.mobile-mode .toggle-btn {
@@ -2443,11 +2667,22 @@ article h3,
   grid-template-columns: 1fr;
   width: 100%;
 }
+.card.mobile-mode .mvu-font-tools {
+  gap: 4px;
+}
+.card.mobile-mode .font-size-btn {
+  flex: 1 1 calc(50% - 4px);
+  text-align: center;
+}
 .card.mobile-mode .mvu-body {
   font-size: 12px;
   line-height: 1.45;
   max-height: 180px;
   padding: 8px;
+}
+.card.mobile-mode .mvu-textbox.mvu-focus-mode {
+  min-height: calc(100vh - 12px - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0));
+  grid-template-rows: auto auto minmax(220px, 1fr) auto;
 }
 .card.mobile-mode .next-actions h3 {
   font-size: 12px;
@@ -2582,16 +2817,38 @@ article h3,
     display: grid;
     grid-template-columns: 1fr;
   }
+  .mvu-font-tools {
+    gap: 4px;
+  }
+  .font-size-btn {
+    flex: 1 1 calc(50% - 4px);
+    text-align: center;
+  }
   .mvu-body {
     font-size: 12px;
     max-height: 190px;
     padding: 8px;
+  }
+  .mvu-textbox.mvu-focus-mode {
+    min-height: calc(100vh - 20px);
+    grid-template-rows: auto auto minmax(200px, 1fr) auto;
   }
   .next-actions {
     padding: 8px;
   }
   .next-actions h3 {
     font-size: 12px;
+  }
+  .allocate-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .counter {
+    align-self: flex-end;
+  }
+  .background-template-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
   .hero {
     align-items: flex-start;

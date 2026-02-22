@@ -1647,7 +1647,7 @@ function finish_create(): void {
   data.value.主角.成长.权柄本源 = false;
 
   data.value.世界.当前时间 = '联合纪年177年8月28日 08:00';
-  data.value.世界.当前地点 = '卡尔斯战姬学院 主校区 报到大厅';
+  data.value.世界.当前地点 = '威曼普战姬学院 主校区 报到大厅';
   data.value.世界.战区威胁等级 = '低';
   data.value.世界.新手引导 = {
     剧情模式: plot_mode.value,
@@ -2889,3 +2889,4 @@ article h3,
   }
 }
 </style>
+

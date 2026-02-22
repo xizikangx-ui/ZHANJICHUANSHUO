@@ -460,6 +460,14 @@
             <li v-for="item in warehouse_items" :key="item.name">
               <span>{{ item.name }}（{{ item.quality }}）</span>
               <strong>x{{ item.count }} / {{ item.category }} / {{ item.value }}联合币</strong>
+              <button
+                v-if="item.usable"
+                type="button"
+                class="toggle-btn"
+                @click="use_warehouse_item(item.name)"
+              >
+                使用
+              </button>
             </li>
           </ul>
         </article>
@@ -570,10 +578,16 @@ const warehouse_items = computed(() => {
       count: Number(raw?.数量 ?? 0),
       category: String(raw?.分类 ?? '杂项'),
       value: Number(raw?.价值 ?? 0),
+      usable: is_library_invitation_item(name) && Number(raw?.数量 ?? 0) > 0,
     }))
     .filter(v => v.count > 0)
     .sort((a, b) => b.count - a.count);
 });
+
+function is_library_invitation_item(name: string): boolean {
+  const n = String(name ?? '').trim();
+  return ['大图书馆邀请函', '威曼普大图书馆邀请函'].includes(n);
+}
 function is_default_name(name: string): boolean {
   const n = String(name ?? '').trim();
   return !n || ['待命战姬', '玩家', '主角', '写卡助手'].includes(n);
@@ -1749,6 +1763,26 @@ async function send_next_action(action: string): Promise<void> {
   }
   // 这里不再弹错误：跨域模式下主页面会通过 message 监听代发，避免误报。
   console.info('[天启黎明] 当前上下文未直接找到输入框，已尝试通过 postMessage 发送。');
+}
+
+async function use_warehouse_item(item_name: string): Promise<void> {
+  if (!is_library_invitation_item(item_name)) return;
+  const stock = _.get(data.value, ['战利品', '仓库', '物品', item_name, '数量'], 0);
+  if (Number(stock) <= 0) return;
+
+  const ok = window.confirm(`确定使用【${item_name}】吗？\n将消耗1个并发送前往大图书馆的请求。`);
+  if (!ok) return;
+
+  _.set(data.value, ['战利品', '仓库', '物品', item_name, '数量'], Math.max(0, Number(stock) - 1));
+  _.set(
+    data.value,
+    ['世界', '近期事务', '大图书馆邀请'],
+    '已使用邀请函，准备前往威曼普城西侧大图书馆外馆办理入馆引导',
+  );
+
+  const action =
+    '我使用大图书馆邀请函，前往威曼普城西侧大图书馆外馆，请按规则引导我入馆并说明当前可进入区域（外馆/内馆权限）。';
+  await send_next_action(action);
 }
 </script>
 

@@ -551,6 +551,7 @@
               <span>等级 {{ char.等级 || '新手' }}</span>
               <span>好感度 {{ char.好感度 }}</span>
               <span>态度 {{ char.态度 }}</span>
+              <button type="button" class="npc-delete-btn" @click="delete_onstage_npc(char.姓名)">删除档案</button>
             </div>
             <p class="onstage-attrs">{{ format_attr_text(char.基础属性) }}</p>
             <details>
@@ -573,6 +574,7 @@
               <span>好感度 {{ npc.好感度 }}</span>
               <span>阶段 {{ npc.好感阶段 }}</span>
               <span>态度 {{ npc.态度 }}</span>
+              <button type="button" class="npc-delete-btn" @click="delete_longterm_npc(npc.姓名)">删除档案</button>
             </div>
             <p class="onstage-attrs">{{ format_attr_text(npc.基础属性) }}</p>
             <p class="onstage-attrs">关系标签：{{ (npc.关系标签 || []).join(' / ') || '无' }}</p>
@@ -1906,6 +1908,24 @@ function toggle_status_bar(): void {
   status_bar_collapsed.value = !status_bar_collapsed.value;
 }
 
+function delete_onstage_npc(raw_name: string): void {
+  const name = String(raw_name ?? '').trim();
+  if (!name) return;
+  if (!window.confirm(`确定删除在场角色档案【${name}】吗？`)) return;
+  const list = Array.isArray(data.value.界面?.在场角色) ? data.value.界面.在场角色 : [];
+  data.value.界面.在场角色 = list.filter((v: any) => String(v?.姓名 ?? '').trim() !== name);
+}
+
+function delete_longterm_npc(raw_name: string): void {
+  const name = String(raw_name ?? '').trim();
+  if (!name) return;
+  if (!window.confirm(`确定删除长期NPC档案【${name}】吗？\n这会同时删除关系追踪记录。`)) return;
+  _.unset(data.value, ['世界', '长期NPC列表', name]);
+  _.unset(data.value, ['世界', 'NPC关系追踪', name]);
+  const onstage = Array.isArray(data.value.界面?.在场角色) ? data.value.界面.在场角色 : [];
+  data.value.界面.在场角色 = onstage.filter((v: any) => String(v?.姓名 ?? '').trim() !== name);
+}
+
 const profession_background_starter = computed(() => profession_background_starters[create_form.职业]);
 
 function apply_background_starter(append: boolean): void {
@@ -2416,6 +2436,19 @@ function apply_background_starter(append: boolean): void {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+.npc-delete-btn {
+  margin-left: auto;
+  border: 1px solid #a54a4a;
+  border-radius: 999px;
+  background: #fff4f4;
+  color: #8e2020;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.npc-delete-btn:hover {
+  background: #ffe7e7;
 }
 .onstage-attrs {
   margin: 6px 0;
@@ -2997,6 +3030,11 @@ article h3,
   }
   .next-actions-grid {
     grid-template-columns: 1fr;
+  }
+  .npc-delete-btn {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 4px;
   }
 }
 </style>

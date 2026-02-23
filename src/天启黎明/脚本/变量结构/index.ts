@@ -410,6 +410,7 @@ const npc_name_stop_words = new Set([
 ]);
 const npc_name_bad_prefix = /^(对着|朝着|向着|就在|站在|位于|那个|这个|那位|这位|新来的|那个谁)/;
 const npc_name_bad_contains = /(写卡助手|主角|玩家|新生|学员|守卫|后勤员|教官|校长|学院|任务|系统|状态栏|日志|空战|地面战|高空|低空|云层|标准空域|湍流层|交锋区|前线|中线|后卫|三点钟|六点钟)/;
+const npc_name_bad_sentence_like = /^(?:(?:我|你|他|她|它|我们|你们|他们|她们|大家|有人|众人|自己|对方|那人|这人|此人|谁)|(?:也|都|只|就|还|又|便|仍|却|并|再))(?:不知|只知|知道|觉得|想着|看着|看向|望着|回头|转身|开口|轻声|沉声|点头|摇头|一愣|一顿|停下)?$/;
 
 function normalizeNpcName(raw: string): string {
   return String(raw ?? '')
@@ -425,6 +426,8 @@ function isLikelyNpcName(name: string, excluded: Set<string>): boolean {
   if (npc_name_stop_words.has(name)) return false;
   if (npc_name_bad_contains.test(name)) return false;
   if (npc_name_bad_prefix.test(name)) return false;
+  if (npc_name_bad_sentence_like.test(name)) return false;
+  if (/^(我|你|他|她|它|这|那|其|该|本|此|也|都|只|就|还|又|便|仍|却|并)/.test(name)) return false;
   if (/[0-9０-９一二三四五六七八九十百千万]/.test(name)) return false;
   if (/(的|了|着|在|中|上|下)$/.test(name)) return false;
   if (!/^[\u4e00-\u9fa5·]{2,6}$/.test(name)) return false;
@@ -2338,6 +2341,7 @@ function buildMvuSummaryPrompt(chat_data: any): string {
   lines.push('判定原则: 玩家先描述行动；若行动不可能/有代价/有风险，先明确告知。仅当玩家明确“要规避风险”时再掷骰。');
   lines.push('叙事风格: 使用自然、人性化表达；非战斗场景避免持续高压训斥和绝望基调，允许正常互动与缓冲节奏。');
   lines.push('角色触发规范: 优先按自然叙事输出即可（系统会从中文正文自动识别在场角色）；若你愿意，也可在末尾附加 <OnStageCharacters>JSON数组提高稳定性。');
+  lines.push('姓名规范: 在场角色姓名必须是真实人名/代号，不得输出“她不知道/也不知/众人/有人/对方”等代词或句子片段作为姓名。');
   lines.push('内心想法规范: 本轮若出现在场角色，必须给出其“本回合内心想法/心理动机”，并随回合刷新，不得长期复用旧句。');
   lines.push('地点硬限制: 角色“薇薇安娜·威曼普”仅允许在“威曼普城西侧·大图书馆”及其内部场景出现；若地点不在大图书馆，禁止让其出场或发言。');
   lines.push('人物弧光规范: 薇薇安娜的态度需随好感阶段自然变化；若阶段=伴侣，必须表现为“成熟克制的并肩关系”，禁止依恋化、幼态化或占有欲表达。');

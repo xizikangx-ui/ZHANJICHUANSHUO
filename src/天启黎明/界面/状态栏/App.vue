@@ -285,8 +285,13 @@
         <pre v-if="display_floor_text" class="mvu-body" :class="`mvu-font-${mvu_font_size}`">{{ display_floor_text }}</pre>
         <p v-else class="empty-tip">当前暂无可展示正文</p>
         <div class="next-actions" :class="{ compact: is_initial_mvu_focus_mode }">
-          <h3>接下来可进行（自动生成，可点击）</h3>
-          <div class="next-actions-grid">
+          <div class="next-actions-head">
+            <h3>{{ next_action_panel_mode === 'options' ? '接下来可进行（自动生成，可点击）' : '手动输入行动（发送到酒馆）' }}</h3>
+            <button type="button" class="next-actions-toggle-btn" @click="toggle_next_action_panel_mode">
+              {{ next_action_panel_mode === 'options' ? '关闭选项栏' : '打开选项栏' }}
+            </button>
+          </div>
+          <div v-if="next_action_panel_mode === 'options'" class="next-actions-grid">
             <button
               v-for="action in next_action_options"
               :key="action"
@@ -296,6 +301,19 @@
             >
               {{ action }}
             </button>
+          </div>
+          <div v-else class="next-actions-inputbox">
+            <textarea
+              v-model.trim="manual_action_input"
+              class="next-actions-textarea"
+              rows="3"
+              placeholder="输入你要发送给酒馆AI的行动（按回车发送，Shift+回车换行）"
+              @keydown.enter.exact.prevent="send_manual_action"
+            />
+            <div class="next-actions-input-actions">
+              <button type="button" class="secondary-btn" @click="clear_manual_action">清空</button>
+              <button type="button" class="start-btn" :disabled="!manual_action_input.trim()" @click="send_manual_action">发送</button>
+            </div>
           </div>
         </div>
       </section>
@@ -606,6 +624,8 @@ const default_next_action_options = [
   '与在场角色进行交流',
 ];
 const next_action_options = ref<string[]>([...default_next_action_options]);
+const next_action_panel_mode = useLocalStorage<'options' | 'input'>('apocalypse_dawn:next_action_panel_mode', 'options');
+const manual_action_input = ref('');
 const is_initial_mvu_focus_mode = computed(() => status_bar_collapsed.value);
 const onstage_characters = computed(() => {
   const list = data.value.界面.在场角色;
@@ -1773,9 +1793,7 @@ function toggle_transform(): void {
   }
 }
 
-async function send_next_action(action: string): Promise<void> {
-  const ok = window.confirm(`确定吗？\n将发送：${action}`);
-  if (!ok) return;
+async function dispatch_action_to_tavern(action: string): Promise<void> {
 
   // 首选酒馆助手官方接口，避免跨域/DOM结构差异导致发送失败。
   try {
@@ -1837,6 +1855,27 @@ async function send_next_action(action: string): Promise<void> {
   }
   // 这里不再弹错误：跨域模式下主页面会通过 message 监听代发，避免误报。
   console.info('[天启黎明] 当前上下文未直接找到输入框，已尝试通过 postMessage 发送。');
+}
+
+async function send_next_action(action: string): Promise<void> {
+  const ok = window.confirm(`确定吗？\n将发送：${action}`);
+  if (!ok) return;
+  await dispatch_action_to_tavern(action);
+}
+
+function toggle_next_action_panel_mode(): void {
+  next_action_panel_mode.value = next_action_panel_mode.value === 'options' ? 'input' : 'options';
+}
+
+function clear_manual_action(): void {
+  manual_action_input.value = '';
+}
+
+async function send_manual_action(): Promise<void> {
+  const action = manual_action_input.value.trim();
+  if (!action) return;
+  await dispatch_action_to_tavern(action);
+  manual_action_input.value = '';
 }
 
 async function use_warehouse_item(item_name: string): Promise<void> {
@@ -2255,10 +2294,58 @@ function apply_background_starter(append: boolean): void {
   border-bottom: 1px dashed #7d8a90;
   background: #f8fcff;
 }
+.next-actions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
 .next-actions h2 {
   font-size: 14px;
   margin-bottom: 8px;
   color: var(--c-accent);
+}
+.next-actions h3 {
+  margin: 0;
+}
+.next-actions-toggle-btn {
+  border: 1px solid #53626a;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff;
+  color: #2d3f49;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.next-actions-toggle-btn:hover {
+  background: #edf4f9;
+}
+.next-actions-inputbox {
+  display: grid;
+  gap: 8px;
+}
+.next-actions-textarea {
+  width: 100%;
+  border: 1px solid #53626a;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #2d3f49;
+  resize: vertical;
+  font-family: var(--font-main);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.next-actions-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.next-actions-input-actions .start-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .next-actions-grid {
   display: grid;
@@ -2688,12 +2775,24 @@ article h3,
   font-size: 12px;
   line-height: 1.3;
 }
+.card.mobile-mode .next-actions-head {
+  flex-direction: column;
+  align-items: stretch;
+}
+.card.mobile-mode .next-actions-toggle-btn {
+  width: 100%;
+  text-align: center;
+}
 .card.mobile-mode .next-actions-grid {
   grid-template-columns: 1fr;
 }
 .card.mobile-mode .next-action-btn {
   font-size: 12px;
   padding: 9px;
+}
+.card.mobile-mode .next-actions-input-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 .card.mobile-mode .hero {
   align-items: flex-start;
@@ -2836,8 +2935,20 @@ article h3,
   .next-actions {
     padding: 8px;
   }
+  .next-actions-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .next-actions-toggle-btn {
+    width: 100%;
+    text-align: center;
+  }
   .next-actions h3 {
     font-size: 12px;
+  }
+  .next-actions-input-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
   .allocate-list li {
     flex-direction: column;
@@ -2889,4 +3000,3 @@ article h3,
   }
 }
 </style>
-

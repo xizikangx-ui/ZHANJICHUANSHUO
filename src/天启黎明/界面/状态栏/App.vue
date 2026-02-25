@@ -5,7 +5,10 @@
         <h1 class="logo">天启黎明</h1>
         <p class="author">作者：未来</p>
         <div class="cover-actions">
-          <button type="button" class="start-btn large" @click="create_stage = 'profile'">开始游戏</button>
+          <button type="button" class="start-btn large" @click="start_normal_route">开始游戏</button>
+          <button type="button" class="xeno-btn large" :class="{ active: xeno_route_mode }" @click="start_xeno_route">
+            {{ xeno_route_mode ? '异种开局：开启' : '异种开局' }}
+          </button>
           <button type="button" class="plot-btn large" :class="{ active: plot_mode }" @click="toggle_plot_mode">
             {{ plot_mode ? '剧情模式：开启' : '剧情模式：关闭' }}
           </button>
@@ -20,13 +23,24 @@
 
       <section v-else-if="create_stage === 'profile'" class="create-panel">
         <h2>建卡 - 基础信息</h2>
+        <div v-if="xeno_route_mode" class="xeno-route-box">
+          <p class="tip strong">当前为异种开局（强认知滤镜路线）</p>
+          <label class="field">
+            <span>异种路线身份：</span>
+            <select v-model="xeno_route_role">
+              <option value="再诞战姬">再诞战姬（强位格）</option>
+              <option value="异种指挥官">异种指挥官（高位个体）</option>
+            </select>
+          </label>
+          <p class="tip">异种线暂时参照原建卡流程，但会写入更强位格与认知滤镜设定。</p>
+        </div>
 
         <label class="field">
           <span>角色姓名：</span>
           <input v-model.trim="create_form.角色姓名" type="text" placeholder="输入角色姓名" />
         </label>
 
-        <label class="field">
+        <label v-if="!xeno_route_mode" class="field">
           <span>职业：</span>
           <select v-model="create_form.职业">
             <option value="指挥官">指挥官</option>
@@ -34,6 +48,7 @@
             <option value="权柄使役者">权柄使役者</option>
           </select>
         </label>
+        <p v-else class="tip profession-mark">基础职业映射：{{ create_form.职业 }}（异种路线身份：{{ xeno_route_role }}）</p>
 
         <label v-if="create_form.职业 === '战姬'" class="field">
           <span>战姬类型：</span>
@@ -693,6 +708,8 @@ const create_stage = ref<CreateStage>('cover');
 const create_error = ref('');
 const cheat_mode = ref(false);
 const plot_mode = ref(false);
+const xeno_route_mode = ref(false);
+const xeno_route_role = ref<'再诞战姬' | '异种指挥官'>('再诞战姬');
 const draft_initialized = ref(false);
 
 const warmaid_types: WarmaidType[] = ['侦察型', '轻型', '中型', '重型', '要塞型', '地面支援姬'];
@@ -836,6 +853,15 @@ const opening_story = `【联合纪年177年8月28日】
 如果光明大圣堂沦陷，整个北部防线有被以点带面凿穿的风险，威曼普城同样根据【第二协议】的条款，派出了【海洋】【魔法支点】【学士】三个结社前往支援。
 而除了这些明面上的力量，新生也不可避免的被卷入了这场漩涡，正面战场也许很难帮得上忙，但是，繁杂的侦查，辅助，探索，清理少量异种的任务，还是不可避免的向你们袭来。
 而幸运与不幸的是，你们这支新成立的学员小队，恰巧成为了最前端的侦察小队，即将承接可能带来最丰厚报偿，也可能是送命的侦查任务……`;
+const xeno_opening_story = `【异种开局 / 联合纪年177年8月28日】
+你是在石棺中醒来的。
+在意识恢复前，有一只冰冷却带着玩味意味的手将你从石棺里拉了出来——那是异种领主【咒妄】。
+你并非以普通新生的视角进入威曼普战姬学院。
+在这条路线中，你拥有更高位格与异常稳定的感知结构：当你注视异种时，会进入一种强认知滤镜。由于异种具有唯心性质，你眼中的部分下级异种会在现实中呈现出与你认知相符的形态与象征特征。
+这不代表你可以无代价改写世界规则，也不代表异种失去危险性。你只是被允许看见更多，也因此更容易被卷入更深层的异种真相与污染风险。
+
+咒妄并没有立刻杀死你。她像是在观察一件罕见样本，又像是在确认某种尚未完成的结果。
+你仍将沿学院建制流程行动，但从一开始，你就被放在了一条与异种前线、高位观察与异常认知相关的危险路线中。`;
 const profession_background_starters: Record<Profession, string> = {
   指挥官: `【指挥官通用背景开局】\n我来自联合或大公国体系下的普通教育与基础军训环境，在进入威曼普学院前已接受过基础纪律、地图判读、队列协同或后勤常识训练，但并非前线老兵。被送入战姬学院后，我的核心目标是尽快完成指挥链路适配，学会与战姬小队稳定协同，并在真实任务中证明自己不是拖后腿的人。`,
   战姬: `【战姬通用背景开局】\n我在近期完成觉醒，被地方机构登记后依照【第二协议】送往威曼普学院。觉醒带来的力量让我既兴奋又不安：身体感知、魔力流动与情绪波动都和过去不同。入学后我需要尽快完成灵装适配、基础战术训练和小队磨合，学会在危险世界里使用这份力量而不是被它拖垮。`,
@@ -1058,6 +1084,29 @@ function toggle_plot_mode(): void {
   }
 }
 
+function sync_xeno_route_profession(): void {
+  if (!xeno_route_mode.value) return;
+  if (xeno_route_role.value === '再诞战姬') {
+    create_form.职业 = '战姬';
+    create_form.性别 = '女性';
+    create_form.年龄 = _.clamp(Number(create_form.年龄) || 16, 12, 21);
+    return;
+  }
+  create_form.职业 = '指挥官';
+  create_form.年龄 = _.clamp(Number(create_form.年龄) || 17, 12, 70);
+}
+
+function start_xeno_route(): void {
+  xeno_route_mode.value = true;
+  sync_xeno_route_profession();
+  create_stage.value = 'profile';
+}
+
+function start_normal_route(): void {
+  xeno_route_mode.value = false;
+  create_stage.value = 'profile';
+}
+
 watch(
   () => create_form.职业,
   () => {
@@ -1076,6 +1125,13 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => xeno_route_role.value,
+  () => {
+    sync_xeno_route_profession();
+  },
 );
 
 watch(
@@ -1105,6 +1161,9 @@ watch(
     create_form.年龄 = saved.年龄;
     cheat_mode.value = Boolean(saved.作弊模式);
     plot_mode.value = Boolean((saved as any).剧情模式);
+    xeno_route_mode.value = Boolean((saved as any).异种开局);
+    xeno_route_role.value = String((saved as any).异种路线身份) === '异种指挥官' ? '异种指挥官' : '再诞战姬';
+    sync_xeno_route_profession();
     draft_initialized.value = true;
   },
   { immediate: true },
@@ -1597,7 +1656,14 @@ function finish_create(): void {
 
   data.value.主角.档案.代号 = name;
   _.set(data.value, '主角.档案.性别', create_form.职业 === '战姬' ? '女性' : create_form.性别);
-  data.value.主角.档案.身份路径 = create_form.职业 === '战姬' ? `战姬-${create_form.战姬类型}` : create_form.职业;
+  if (xeno_route_mode.value) {
+    data.value.主角.档案.阵营 = '异种线';
+    data.value.主角.档案.职阶 = xeno_route_role.value === '再诞战姬' ? '再诞战姬' : '异种指挥官';
+    data.value.主角.档案.身份路径 =
+      xeno_route_role.value === '再诞战姬' ? `异种线-再诞战姬-${create_form.战姬类型}` : '异种线-异种指挥官';
+  } else {
+    data.value.主角.档案.身份路径 = create_form.职业 === '战姬' ? `战姬-${create_form.战姬类型}` : create_form.职业;
+  }
 
   data.value.主角.人类属性 = { ...human_attr };
   data.value.主角.锻炼 = {
@@ -1693,14 +1759,22 @@ function finish_create(): void {
     引导链: plot_mode.value
       ? '阶段1/3 入学手续：身份核验→链路适配→纪律简报。'
       : '剧情模式关闭：不强制入学引导链。',
+    ...(xeno_route_mode.value
+      ? {
+          异种路线: `已开启（${xeno_route_role.value}）`,
+          认知滤镜: '主角以高位格观察异种，下级异种可能发生认知显现偏移。',
+        }
+      : {}),
   };
 
   data.value.战场日志 = {
-    开场简报: '联合纪年177年8月28日，新生小队在威曼普学院报到并被编入前沿侦察序列。',
+    开场简报: xeno_route_mode.value
+      ? `联合纪年177年8月28日，异种路线已开启（${xeno_route_role.value}），主角以高位格视角进入威曼普学院建制流程。`
+      : '联合纪年177年8月28日，新生小队在威曼普学院报到并被编入前沿侦察序列。',
   };
   data.value.界面.楼层文本 = {
-    正文: opening_story,
-    原文: opening_story,
+    正文: xeno_route_mode.value ? xeno_opening_story : opening_story,
+    原文: xeno_route_mode.value ? xeno_opening_story : opening_story,
     更新时间: Date.now(),
   };
   data.value.界面.在场角色 = [];
@@ -2087,6 +2161,24 @@ function apply_background_starter(append: boolean): void {
   font-size: 16px;
   padding: 10px 20px;
 }
+.xeno-btn {
+  border: 1px solid #6a3f93;
+  background: #f4edff;
+  color: #4f2f73;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.xeno-btn.active {
+  background: #6b3fa0;
+  color: #fff;
+  border-color: #6b3fa0;
+}
+.xeno-btn.large {
+  font-size: 16px;
+  padding: 10px 20px;
+}
 .mobile-btn {
   border: 1px solid #4a6b3a;
   background: #f2fff0;
@@ -2117,6 +2209,14 @@ function apply_background_starter(append: boolean): void {
 .cheat-btn.active {
   background: #b00020;
   color: #fff;
+}
+.xeno-route-box {
+  border: 1px solid #8972a9;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbf8ff 0%, #f3eeff 100%);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
 }
 .secondary-btn {
   border: 1px solid #55646d;
@@ -2743,6 +2843,7 @@ article h3,
 .card.mobile-mode .actions > button,
 .card.mobile-mode .background-template-actions > button,
 .card.mobile-mode .plot-btn,
+.card.mobile-mode .xeno-btn,
 .card.mobile-mode .status-toggle-btn,
 .card.mobile-mode .mobile-btn,
 .card.mobile-mode .fullscreen-btn,
@@ -2889,6 +2990,7 @@ article h3,
   min-width: 0;
 }
 .card.mobile-mode .plot-btn,
+.card.mobile-mode .xeno-btn,
 .card.mobile-mode .mobile-btn {
   white-space: normal;
   line-height: 1.2;

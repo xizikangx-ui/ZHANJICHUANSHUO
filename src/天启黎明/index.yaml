@@ -795,7 +795,7 @@
         ```
         <body>
         <script>
-        $('body').load('https://testingcf.jsdelivr.net/gh/xizikangx-ui/limingchuanshuo@3eb3254/dist/天启黎明/界面/状态栏/index.html?v=20260222k')
+        $('body').load('https://testingcf.jsdelivr.net/gh/xizikangx-ui/limingchuanshuo@0eeb499/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
         </script>
         </body>
         ```
@@ -814,7 +814,7 @@
         ```
         <body>
         <script>
-        $('body').load('http://localhost:5500/dist/天启黎明/界面/状态栏/index.html?v=20260222k')
+        $('body').load('http://localhost:5500/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
         </script>
         </body>
         ```
@@ -839,7 +839,8 @@
         启用: true
         类型: 脚本
         内容: |-
-          import 'https://testingcf.jsdelivr.net/gh/xizikangx-ui/limingchuanshuo@3eb3254/dist/天启黎明/脚本/变量结构/index.js?v=20260222k';
+          import 'https://testingcf.jsdelivr.net/gh/xizikangx-ui/limingchuanshuo@0eeb499/dist/天启黎明/脚本/变量结构/index.js?v=20260222l';
+
 
 
 

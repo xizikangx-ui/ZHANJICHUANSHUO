@@ -1787,11 +1787,24 @@ function ensureCoreResourceBaseline(stat_data: any): void {
   if (!stat_data || typeof stat_data !== 'object') return;
 
   const build_started = Boolean(_.get(stat_data, '界面.建卡.已开始', false));
+  const con_base = Math.max(1, asNumber(_.get(stat_data, '主角.人类属性.体质', 1), 1));
+  const hp_formula_base = con_base * 100;
+  const has_real_skill_check = Number(_.get(stat_data, '主角.技能检定.更新时间', 0)) > 0;
+  const in_battle = Boolean(_.get(stat_data, '主角.战术.是否战斗中', false));
+  const game_over = Boolean(_.get(stat_data, '界面.游戏结束.已结束', false));
+  const round_now = asNumber(_.get(stat_data, '主角.战术.当前轮次', 1), 1);
 
   let max_hp = asNumber(_.get(stat_data, '主角.资源.最大生命', 100), 100);
-  if (max_hp < 1) max_hp = 100;
+  if (build_started) max_hp = Math.max(max_hp, hp_formula_base);
+  if (max_hp < 1) max_hp = build_started ? hp_formula_base : 100;
   let hp = asNumber(_.get(stat_data, '主角.资源.当前生命', max_hp), max_hp);
   if (!build_started && hp <= 0) hp = max_hp;
+  // 兜底修复：部分模型/预设会在开局首轮错误写入HP=0，导致“刚开局就终局”。
+  // 仅在未发生真实检定、非战斗、未终局、早期开局阶段下按体质*100恢复。
+  if (build_started && hp <= 0 && !in_battle && !game_over && !has_real_skill_check && round_now <= 1) {
+    hp = max_hp;
+    _.set(stat_data, '世界.近期事务.资源校验', `检测到开局生命值异常，已按体质基线修复为 ${hp}/${max_hp}`);
+  }
   hp = _.clamp(hp, 0, max_hp);
   _.set(stat_data, '主角.资源.最大生命', max_hp);
   _.set(stat_data, '主角.资源.当前生命', hp);

@@ -1,0 +1,11 @@
+﻿---
+交错频道:
+  rule: the following must be inserted to the reply and cannot be omitted
+  format: |-
+    <cross_channel>
+    <small>
+    ```yaml
+    ⚖️ 交错频道: ${以旁白视角，对当前局势进行不具参考价值的简短吐槽，字数不超过100字。可适度使用{{random::emoji::颜文字}}。}
+    ```
+    </small>
+    </cross_channel>

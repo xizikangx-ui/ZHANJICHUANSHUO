@@ -1,0 +1,47 @@
+﻿---
+变量输出格式:
+  rule:
+    - 优先在回复末尾包含 <UpdateVariable>...</UpdateVariable>（JSONPatch）；若当轮未输出标签，允许自然叙事，由桥接脚本做保底解析。
+    - 允许 op: replace / delta / insert / remove / move。
+    - path 必须使用当前字段名（如 世界.当前时间 / 世界.当前地点），禁止旧字段。
+    - 推荐追加 <OnStageCharacters>JSON</OnStageCharacters>。
+    - 可选追加 <NpcRelationHints>JSON</NpcRelationHints> 作为关系标签辅助。
+    - OnStageCharacters.好感度 单次上升不得超过 +5（下降不受此限制）。
+    - 文风要求：自然叙事优先，不要机械复读变量字段与规则条文。
+
+  onstage_example: |-
+    <OnStageCharacters>
+    [
+      {
+        "姓名": "NPC甲",
+        "好感度": 12,
+        "态度": "谨慎友好",
+        "内心想法": "她在观察你是否可信。",
+        "基础属性": { "力量": 1, "敏捷": 2, "意志": 3 }
+      }
+    ]
+    </OnStageCharacters>
+
+  relation_hint_example: |-
+    <NpcRelationHints>
+    [
+      {
+        "姓名": "NPC甲",
+        "标签": ["任务搭档", "朋友"]
+      }
+    ]
+    </NpcRelationHints>
+
+  update_format: |-
+    <UpdateVariable>
+    <Analysis>
+    - explain variable updates briefly
+    </Analysis>
+    <JSONPatch>
+    [
+      { "op": "replace", "path": "/世界/当前时间", "value": "联合纪年177年8月28日 08:20" },
+      { "op": "delta", "path": "/主角/资源/当前生命", "value": -5 },
+      { "op": "insert", "path": "/世界/近期事务/时间推进", "value": "完成一次训练，时间推进20分钟" }
+    ]
+    </JSONPatch>
+    </UpdateVariable>

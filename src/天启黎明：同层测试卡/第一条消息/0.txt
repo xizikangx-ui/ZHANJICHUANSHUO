@@ -1,0 +1,2 @@
+<StatusPlaceHolderImpl/>
+【系统】同层测试卡已载入。请直接输入你的行动，界面内会实时显示 AI 回复。

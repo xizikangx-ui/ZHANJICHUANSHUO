@@ -263,8 +263,19 @@
             </label>
             <label>
               <span>Model</span>
-              <input v-model.trim="settings.model" placeholder="gpt-4.1-mini" />
+              <input v-model.trim="settings.model" list="th-model-options" placeholder="gpt-4.1-mini" />
+              <datalist id="th-model-options">
+                <option v-for="item in modelOptions" :key="item" :value="item">{{ item }}</option>
+              </datalist>
             </label>
+            <div class="row">
+              <button type="button" class="ghost small" :disabled="modelFetchRunning" @click="fetchModelOptions">
+                {{ modelFetchRunning ? '读取中...' : '读取模型列表' }}
+              </button>
+              <span class="hint">
+                {{ modelOptions.length ? `已加载 ${modelOptions.length} 个模型` : '填写URL和秘钥后可读取模型信息' }}
+              </span>
+            </div>
             <label>
               <span>System Prompt</span>
               <textarea v-model="settings.systemPrompt" rows="3"></textarea>
@@ -779,6 +790,8 @@ const defaultSettings = {
   megaSummaryVarApiPayload: '{"scope":"mega_memory","need":["global_flags","chapter_progress"]}',
 };
 const settings = reactive({ ...defaultSettings });
+const modelOptions = ref<string[]>([]);
+const modelFetchRunning = ref(false);
 const memoryVault = ref<MemoryEntry[]>([]);
 const megaMemoryVault = ref<MemoryEntry[]>([]);
 const onstageNpcs = ref<NpcEntry[]>([]);
@@ -1143,6 +1156,59 @@ const pullFromTavern = () => {
 const buildApiUrl = (baseUrl: string) => {
   const cleaned = baseUrl.trim().replace(/\/+$/, '');
   return cleaned.endsWith('/chat/completions') ? cleaned : `${cleaned}/chat/completions`;
+};
+
+const buildModelsUrl = (baseUrl: string) => {
+  const cleaned = baseUrl.trim().replace(/\/+$/, '');
+  if (!cleaned) return '';
+  if (/\/chat\/completions$/i.test(cleaned)) return cleaned.replace(/\/chat\/completions$/i, '/models');
+  if (/\/models$/i.test(cleaned)) return cleaned;
+  return `${cleaned}/models`;
+};
+
+const extractModelIds = (payload: any) => {
+  const rawList = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.models)
+        ? payload.models
+        : [];
+  const ids = rawList
+    .map((item: any) => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item.id === 'string') return item.id.trim();
+      if (item && typeof item.name === 'string') return item.name.trim();
+      return '';
+    })
+    .filter(Boolean);
+  return Array.from(new Set(ids)).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+};
+
+const fetchModelOptions = async () => {
+  const url = buildModelsUrl(settings.baseUrl);
+  if (!url) {
+    pushSystemNotice('请先填写 Base URL。');
+    return;
+  }
+  modelFetchRunning.value = true;
+  try {
+    const headers: Record<string, string> = {};
+    if (settings.apiKey?.trim()) headers.Authorization = `Bearer ${settings.apiKey.trim()}`;
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const ids = extractModelIds(data);
+    if (!ids.length) throw new Error('未解析到模型列表，请确认接口返回格式。');
+    modelOptions.value = ids;
+    if (!settings.model || !ids.includes(settings.model)) settings.model = ids[0];
+    pushSystemNotice(`模型信息读取成功，共 ${ids.length} 个。`);
+    saveSettings();
+  } catch (error: any) {
+    pushMessage('error', `读取模型信息失败: ${error?.message ?? String(error)}`);
+  } finally {
+    modelFetchRunning.value = false;
+  }
 };
 
 const buildPayloadMessages = () => {

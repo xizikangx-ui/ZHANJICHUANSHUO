@@ -702,7 +702,7 @@
         ```
         <body>
         <script>
-        $('body').load('https://testingcf.jsdelivr.net/gh/xizikangx-ui/limingchuanshuo@0eeb499/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
+        $('body').load('https://testingcf.jsdelivr.net/gh/xizikangx-ui/ZHANJICHUANSHUO@main/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
         </script>
         </body>
         ```
@@ -721,7 +721,7 @@
         ```
         <body>
         <script>
-        $('body').load('https://raw.githubusercontent.com/xizikangx-ui/ZHANJICHUANSHUO/main/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
+        $('body').load('http://127.0.0.1:5500/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
         </script>
         </body>
         ```
@@ -746,7 +746,7 @@
         启用: true
         类型: 脚本
         内容: |-
-          import 'https://testingcf.jsdelivr.net/gh/xizikangx-ui/limingchuanshuo@0eeb499/dist/天启黎明/脚本/变量结构/index.js?v=20260222l';
+          import 'https://testingcf.jsdelivr.net/gh/xizikangx-ui/ZHANJICHUANSHUO@main/dist/天启黎明/脚本/变量结构/index.js?v=20260222l';
 
       - 名称: 同层测试主脚本
         id: d6cf5f46-1ac8-42ba-aed4-402145f814a0
@@ -754,7 +754,7 @@
         类型: 脚本
         内容: |-
           (async () => {
-            const url = 'https://raw.githubusercontent.com/xizikangx-ui/ZHANJICHUANSHUO/main/dist/layer_test_script/index.js';
+            const url = 'https://testingcf.jsdelivr.net/gh/xizikangx-ui/ZHANJICHUANSHUO@main/dist/layer_test_script/index.js';
             try {
               await import(`${url}?t=${Date.now()}`);
               toastr.success('[同层测试] 同层脚本已加载');
@@ -770,7 +770,7 @@
         类型: 脚本
         内容: |-
           (async () => {
-            const url = 'https://raw.githubusercontent.com/xizikangx-ui/ZHANJICHUANSHUO/main/dist/layer_test_panel/index.js';
+            const url = 'https://testingcf.jsdelivr.net/gh/xizikangx-ui/ZHANJICHUANSHUO@main/dist/layer_test_panel/index.js';
             try {
               await import(`${url}?t=${Date.now()}`);
               toastr.success('[同层测试] 独立界面脚本已加载');
@@ -779,8 +779,5 @@
               toastr.error('[同层测试] 独立界面脚本加载失败，请检查 GitHub 仓库地址是否可访问');
             }
           })();
-
-
-
 
 

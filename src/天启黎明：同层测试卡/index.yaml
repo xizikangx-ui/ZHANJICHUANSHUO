@@ -702,7 +702,7 @@
         ```
         <body>
         <script>
-        $('body').load('https://testingcf.jsdelivr.net/gh/xizikangx-ui/ZHANJICHUANSHUO@main/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
+        $('body').load('https://testingcf.jsdelivr.net/gh/xizikangx-ui/ZHANJICHUANSHUO@main/dist/天启黎明：同层测试/index.html?v=20260301b')
         </script>
         </body>
         ```
@@ -721,7 +721,7 @@
         ```
         <body>
         <script>
-        $('body').load('http://127.0.0.1:5500/dist/天启黎明/界面/状态栏/index.html?v=20260222l')
+        $('body').load('http://127.0.0.1:5500/dist/天启黎明：同层测试/index.html?v=20260301b')
         </script>
         </body>
         ```
@@ -779,4 +779,3 @@
               toastr.error('[同层测试] 独立界面脚本加载失败，请检查 GitHub 仓库地址是否可访问');
             }
           })();
-

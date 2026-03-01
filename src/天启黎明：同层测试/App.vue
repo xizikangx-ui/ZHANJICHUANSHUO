@@ -344,6 +344,65 @@
               <span>超大总结变量API请求体（JSON，可空）</span>
               <textarea v-model="settings.megaSummaryVarApiPayload" rows="3"></textarea>
             </label>
+            <hr />
+            <label class="toggle">
+              <input v-model="settings.specialMemoryEnabled" type="checkbox" />
+              <span>启用特殊记忆NPC独立计算</span>
+            </label>
+            <label>
+              <span>特殊记忆NPC</span>
+              <select v-model.number="settings.specialMemoryNpcId">
+                <option :value="0">未选择</option>
+                <option v-for="npc in allNpcs" :key="npc.id" :value="npc.id">{{ npc.name }}（{{ npc.role }}）</option>
+              </select>
+            </label>
+            <label class="toggle">
+              <input v-model="settings.specialMemoryUseCurrentApi" type="checkbox" />
+              <span>特殊记忆NPC优先使用当前酒馆API</span>
+            </label>
+            <label>
+              <span>特殊记忆NPC Base URL</span>
+              <input v-model.trim="settings.specialMemoryBaseUrl" placeholder="https://api.openai.com/v1" />
+            </label>
+            <label>
+              <span>特殊记忆NPC API Key</span>
+              <input v-model.trim="settings.specialMemoryApiKey" type="password" placeholder="sk-..." />
+            </label>
+            <label>
+              <span>特殊记忆NPC Model</span>
+              <input v-model.trim="settings.specialMemoryModel" list="th-special-model-options" placeholder="gpt-4.1-mini" />
+              <datalist id="th-special-model-options">
+                <option v-for="item in specialModelOptions" :key="item" :value="item">{{ item }}</option>
+              </datalist>
+            </label>
+            <div class="row">
+              <button type="button" class="ghost small" :disabled="specialModelFetchRunning" @click="fetchSpecialModelOptions">
+                {{ specialModelFetchRunning ? '读取中...' : '读取特殊NPC模型列表' }}
+              </button>
+              <span class="hint">
+                {{ specialModelOptions.length ? `已加载 ${specialModelOptions.length} 个模型` : '可独立读取特殊NPC模型' }}
+              </span>
+            </div>
+            <label class="full">
+              <span>特殊记忆NPC提示词</span>
+              <textarea v-model="settings.specialMemoryPrompt" rows="4"></textarea>
+            </label>
+            <label class="toggle">
+              <input v-model="settings.specialMemoryUseVarApi" type="checkbox" />
+              <span>特殊记忆NPC使用独立变量API</span>
+            </label>
+            <label>
+              <span>特殊记忆NPC变量API URL</span>
+              <input v-model.trim="settings.specialMemoryVarApiUrl" placeholder="https://your-api/npc-vars" />
+            </label>
+            <label>
+              <span>特殊记忆NPC变量API Key</span>
+              <input v-model.trim="settings.specialMemoryVarApiKey" type="password" placeholder="Bearer Token" />
+            </label>
+            <label class="full">
+              <span>特殊记忆NPC变量API请求体（JSON，可空）</span>
+              <textarea v-model="settings.specialMemoryVarApiPayload" rows="3"></textarea>
+            </label>
             <div class="row">
               <button type="button" @click="saveSettings">保存设置</button>
               <button type="button" class="ghost" @click="resetSession">清空会话</button>
@@ -467,6 +526,26 @@
                   <p v-if="!longtermNpcs.length" class="hint">暂无长期NPC</p>
                 </section>
               </div>
+              <div class="row">
+                <strong>NPC自主行动</strong>
+                <span class="hint">已记录 {{ npcAutoActions.length }} 条</span>
+                <button type="button" class="ghost small" :disabled="specialNpcRunning" @click="runSpecialMemoryNpcTurn('manual')">
+                  {{ specialNpcRunning ? '独立计算中...' : '手动触发自主行动' }}
+                </button>
+                <button type="button" class="ghost small" @click="npcAutoPanelCollapsed = !npcAutoPanelCollapsed">
+                  {{ npcAutoPanelCollapsed ? '展开自主行动' : '收起自主行动' }}
+                </button>
+              </div>
+              <div v-if="!npcAutoPanelCollapsed">
+                <article v-for="item in npcAutoActionsReversed" :key="item.id" class="memory-item">
+                  <header>
+                    <strong>{{ item.name }} / {{ item.source }}</strong>
+                    <span class="hint">{{ formatTs(item.createdAt) }} / {{ item.extraVarNote }}</span>
+                  </header>
+                  <pre>{{ item.action }}</pre>
+                </article>
+                <p v-if="!npcAutoActions.length" class="hint">暂无自主行动记录。</p>
+              </div>
             </template>
           </section>
         </div>
@@ -511,6 +590,15 @@ type XenoRouteRole = '再诞战姬' | '异种指挥官';
 type MemoryEntry = { id: number; floorStart: number; floorEnd: number; summary: string; createdAt: number; extraVarNote: string };
 type NpcEntry = { id: number; name: string; role: string; relation: string; status: string; tags: string };
 type InventoryItem = { id: number; name: string; count: number; note: string };
+type NpcAutoActionEntry = {
+  id: number;
+  npcId: number;
+  name: string;
+  action: string;
+  createdAt: number;
+  source: '自动触发' | '手动触发';
+  extraVarNote: string;
+};
 type DbTaskState = { active: boolean; completed: boolean; label: string; seconds: number };
 
 const props = withDefaults(defineProps<{ mode?: Mode }>(), { mode: 'standalone' });
@@ -788,15 +876,32 @@ const defaultSettings = {
   megaSummaryVarApiUrl: '',
   megaSummaryVarApiKey: '',
   megaSummaryVarApiPayload: '{"scope":"mega_memory","need":["global_flags","chapter_progress"]}',
+  specialMemoryEnabled: false,
+  specialMemoryNpcId: 0,
+  specialMemoryUseCurrentApi: true,
+  specialMemoryBaseUrl: '',
+  specialMemoryApiKey: '',
+  specialMemoryModel: '',
+  specialMemoryPrompt:
+    '你是特殊记忆NPC的独立行动内核。请基于最近对话与设定，输出该NPC此刻最可能执行的一条自主行动，格式：行动目标/行动内容/潜在风险。',
+  specialMemoryUseVarApi: false,
+  specialMemoryVarApiUrl: '',
+  specialMemoryVarApiKey: '',
+  specialMemoryVarApiPayload: '{"scope":"special_npc","need":["npc_state","world_state","recent_flags"]}',
 };
 const settings = reactive({ ...defaultSettings });
 const modelOptions = ref<string[]>([]);
 const modelFetchRunning = ref(false);
+const specialModelOptions = ref<string[]>([]);
+const specialModelFetchRunning = ref(false);
 const memoryVault = ref<MemoryEntry[]>([]);
 const megaMemoryVault = ref<MemoryEntry[]>([]);
 const onstageNpcs = ref<NpcEntry[]>([]);
 const longtermNpcs = ref<NpcEntry[]>([]);
 const inventoryItems = ref<InventoryItem[]>([]);
+const npcAutoActions = ref<NpcAutoActionEntry[]>([]);
+const specialNpcRunning = ref(false);
+const npcAutoPanelCollapsed = ref(true);
 const npcEditor = reactive({
   name: '',
   role: '',
@@ -853,6 +958,13 @@ const memoryVaultHint = computed(() => {
 });
 const memoryVaultReversed = computed(() => [...memoryVault.value].reverse());
 const megaMemoryVaultReversed = computed(() => [...megaMemoryVault.value].reverse());
+const npcAutoActionsReversed = computed(() => [...npcAutoActions.value].reverse());
+const allNpcs = computed(() => [...onstageNpcs.value, ...longtermNpcs.value]);
+const selectedSpecialMemoryNpc = computed(() => {
+  const id = Number(settings.specialMemoryNpcId) || 0;
+  if (!id) return null;
+  return allNpcs.value.find(n => n.id === id) ?? null;
+});
 
 const messages = ref<ChatItem[]>([{ id: nextId.value++, role: 'assistant', content: '已就绪。你可以直接输入行动。' }]);
 const playerResource = reactive({
@@ -1019,12 +1131,24 @@ watch(
 );
 
 watch(
+  allNpcs,
+  npcs => {
+    const id = Number(settings.specialMemoryNpcId) || 0;
+    if (!id) return;
+    if (!npcs.some(n => n.id === id)) settings.specialMemoryNpcId = 0;
+  },
+  { deep: true },
+);
+
+watch(
   [
     memoryVault,
     megaMemoryVault,
     onstageNpcs,
     longtermNpcs,
     inventoryItems,
+    npcAutoActions,
+    npcAutoPanelCollapsed,
     () => ({ ...playerResource }),
     summaryLastFloor,
     hiddenFloorUntil,
@@ -1049,6 +1173,8 @@ const saveRuntimeState = () => {
       onstageNpcs: onstageNpcs.value,
       longtermNpcs: longtermNpcs.value,
       inventoryItems: inventoryItems.value,
+      npcAutoActions: npcAutoActions.value,
+      npcAutoPanelCollapsed: npcAutoPanelCollapsed.value,
       playerResource: { ...playerResource },
       summaryLastFloor: summaryLastFloor.value,
       hiddenFloorUntil: hiddenFloorUntil.value,
@@ -1076,6 +1202,8 @@ const loadRuntimeState = () => {
     onstageNpcs.value = Array.isArray(parsed.onstageNpcs) ? parsed.onstageNpcs : [];
     longtermNpcs.value = Array.isArray(parsed.longtermNpcs) ? parsed.longtermNpcs : [];
     inventoryItems.value = Array.isArray(parsed.inventoryItems) ? parsed.inventoryItems : [];
+    npcAutoActions.value = Array.isArray(parsed.npcAutoActions) ? parsed.npcAutoActions : [];
+    npcAutoPanelCollapsed.value = parsed.npcAutoPanelCollapsed !== false;
     Object.assign(playerResource, parsed.playerResource ?? {});
     playerResource.hpMax = Math.max(1, Number(playerResource.hpMax) || 100);
     playerResource.mpMax = Math.max(1, Number(playerResource.mpMax) || 100);
@@ -1091,6 +1219,8 @@ const loadRuntimeState = () => {
     onstageNpcs.value = [];
     longtermNpcs.value = [];
     inventoryItems.value = [];
+    npcAutoActions.value = [];
+    npcAutoPanelCollapsed.value = true;
     resetPlayerResource();
     summaryLastFloor.value = 0;
     hiddenFloorUntil.value = 0;
@@ -1107,6 +1237,7 @@ const resetSession = () => {
   onstageNpcs.value = [];
   longtermNpcs.value = [];
   inventoryItems.value = [];
+  npcAutoActions.value = [];
   resetPlayerResource();
   summaryLastFloor.value = 0;
   hiddenFloorUntil.value = 0;
@@ -1211,6 +1342,32 @@ const fetchModelOptions = async () => {
   }
 };
 
+const fetchSpecialModelOptions = async () => {
+  const url = buildModelsUrl(settings.specialMemoryBaseUrl);
+  if (!url) {
+    pushSystemNotice('请先填写特殊记忆NPC Base URL。');
+    return;
+  }
+  specialModelFetchRunning.value = true;
+  try {
+    const headers: Record<string, string> = {};
+    if (settings.specialMemoryApiKey?.trim()) headers.Authorization = `Bearer ${settings.specialMemoryApiKey.trim()}`;
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const ids = extractModelIds(data);
+    if (!ids.length) throw new Error('未解析到模型列表，请确认接口返回格式。');
+    specialModelOptions.value = ids;
+    if (!settings.specialMemoryModel || !ids.includes(settings.specialMemoryModel)) settings.specialMemoryModel = ids[0];
+    pushSystemNotice(`特殊NPC模型读取成功，共 ${ids.length} 个。`);
+    saveSettings();
+  } catch (error: any) {
+    pushMessage('error', `读取特殊NPC模型信息失败: ${error?.message ?? String(error)}`);
+  } finally {
+    specialModelFetchRunning.value = false;
+  }
+};
+
 const buildPayloadMessages = () => {
   const payload: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
   const systemBlocks = [settings.systemPrompt, playerBuildHint.value];
@@ -1293,12 +1450,112 @@ const requestTextByManualApi = async (userPrompt: string) => {
   return String(data?.choices?.[0]?.message?.content ?? '').trim();
 };
 
+const requestTextByApiConfig = async (options: { baseUrl: string; apiKey: string; model: string; systemPrompt: string }, userPrompt: string) => {
+  if (!options.baseUrl || !options.model) throw new Error('缺少 Base URL 或 Model。');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (options.apiKey) headers.Authorization = `Bearer ${options.apiKey}`;
+  const response = await fetch(buildApiUrl(options.baseUrl), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: options.model,
+      stream: false,
+      messages: [
+        { role: 'system', content: options.systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    }),
+  });
+  if (!response.ok) throw new Error(`请求失败: HTTP ${response.status}`);
+  const data = await response.json();
+  return String(data?.choices?.[0]?.message?.content ?? '').trim();
+};
+
 const requestSummaryText = async (userPrompt: string, useCurrentApi: boolean) => {
   if (useCurrentApi && inTavern.value && settings.useTavernPreset) {
     const text = await generate({ user_input: userPrompt, should_stream: false, should_silence: true });
     if (String(text ?? '').trim()) return String(text).trim();
   }
   return requestTextByManualApi(userPrompt);
+};
+
+const buildRecentTranscript = (floors = 2) => {
+  const playableFloors = Math.max(0, pageRanges.value.length - 1);
+  if (!playableFloors) return '';
+  const end = playableFloors;
+  const start = Math.max(1, end - floors + 1);
+  return buildFloorTranscript(start, end);
+};
+
+const runSpecialMemoryNpcTurn = async (trigger: 'auto' | 'manual') => {
+  if (!settings.specialMemoryEnabled) return;
+  const npc = selectedSpecialMemoryNpc.value;
+  if (!npc) {
+    if (trigger === 'manual') pushSystemNotice('请先在设置中选择特殊记忆NPC。');
+    return;
+  }
+  if (specialNpcRunning.value) return;
+  specialNpcRunning.value = true;
+  let extraVars = '';
+  try {
+    extraVars = await fetchExtraVariablesByConfig({
+      useVarApi: settings.specialMemoryUseVarApi,
+      url: settings.specialMemoryVarApiUrl,
+      key: settings.specialMemoryVarApiKey,
+      payload: settings.specialMemoryVarApiPayload,
+    });
+  } catch (error: any) {
+    pushSystemNotice(`特殊记忆NPC变量API读取失败，已忽略：${error?.message ?? String(error)}`);
+  }
+
+  try {
+    const prompt = [
+      settings.specialMemoryPrompt,
+      `[NPC档案] 名字=${npc.name} | 定位=${npc.role} | 关系=${npc.relation} | 状态=${npc.status} | 标签=${npc.tags}`,
+      '[玩家建卡快照]',
+      playerBuildHint.value,
+      memoryVaultHint.value ? `[记忆库摘要]\n${memoryVaultHint.value}` : '',
+      '[最近楼层对话]',
+      buildRecentTranscript(2),
+      extraVars ? `[额外变量API返回]\n${extraVars}` : '',
+      '[输出要求] 严格输出一段“NPC自主行动”，需可执行、具体，不要解释系统规则。',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    let actionText = '';
+    if (settings.specialMemoryUseCurrentApi && inTavern.value && settings.useTavernPreset) {
+      const text = await generate({ user_input: prompt, should_stream: false, should_silence: true });
+      actionText = String(text ?? '').trim();
+    } else {
+      actionText = await requestTextByApiConfig(
+        {
+          baseUrl: settings.specialMemoryBaseUrl,
+          apiKey: settings.specialMemoryApiKey,
+          model: settings.specialMemoryModel,
+          systemPrompt: '你是NPC自主行动决策器。必须短、准、可执行。',
+        },
+        prompt,
+      );
+    }
+
+    const action = actionText || '（未返回可用行动）';
+    npcAutoActions.value.push({
+      id: Date.now() + Math.floor(Math.random() * 10000),
+      npcId: npc.id,
+      name: npc.name,
+      action,
+      createdAt: Date.now(),
+      source: trigger === 'manual' ? '手动触发' : '自动触发',
+      extraVarNote: extraVars ? '已使用独立变量API' : '未使用独立变量API',
+    });
+    if (npcAutoActions.value.length > 60) npcAutoActions.value = npcAutoActions.value.slice(-60);
+    pushSystemNotice(`已生成 ${npc.name} 的自主行动。`);
+  } catch (error: any) {
+    if (trigger === 'manual') pushMessage('error', `特殊记忆NPC行动生成失败: ${error?.message ?? String(error)}`);
+  } finally {
+    specialNpcRunning.value = false;
+  }
 };
 
 const maybeRunMegaSummary = async (force = false) => {
@@ -1486,6 +1743,7 @@ const requestAi = async () => {
     if (inTavern.value && settings.useTavernPreset) await requestWithTavernPreset();
     else await requestWithManualApi();
     await maybeRunAutoSummary();
+    void runSpecialMemoryNpcTurn('auto');
   } catch (error: any) {
     pushMessage('error', `请求失败: ${error?.message ?? String(error)}`);
   } finally {
@@ -1586,6 +1844,7 @@ const addNpc = () => {
 const removeNpc = (id: number, type: 'onstage' | 'longterm') => {
   if (type === 'onstage') onstageNpcs.value = onstageNpcs.value.filter(n => n.id !== id);
   else longtermNpcs.value = longtermNpcs.value.filter(n => n.id !== id);
+  if (Number(settings.specialMemoryNpcId) === id) settings.specialMemoryNpcId = 0;
 };
 
 const addInventoryItem = () => {

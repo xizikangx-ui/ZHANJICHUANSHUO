@@ -71,7 +71,10 @@
     "vue-eslint-parser": "^10.4.0",
     "vue-loader": "^17.4.2",
     "vue-style-loader": "^4.1.3",
+<<<<<<< HEAD
     "vue-tsc": "^3.2.6",
+=======
+>>>>>>> df19bf5a213c5e38b25c07c65b47a908c4cdd7ce
     "webpack": "^5.106.1",
     "webpack-cli": "^6.0.1",
     "webpack-obfuscator": "^3.6.1",
@@ -84,6 +87,10 @@
     "@vueuse/integrations": "^13.9.0",
     "@vueuse/shared": "^13.9.0",
     "async-wait-until": "^2.0.31",
+<<<<<<< HEAD
+=======
+    "axios": "1.14.0",
+>>>>>>> df19bf5a213c5e38b25c07c65b47a908c4cdd7ce
     "compare-versions": "^6.1.1",
     "dedent": "^1.7.2",
     "gsap": "^3.14.2",
